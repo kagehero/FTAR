@@ -11,6 +11,8 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [name, setName] = useState('')
+  const [grade, setGrade] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -33,7 +35,7 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const result = await registerWithEmail(email, password)
+      const result = await registerWithEmail(email, password, name, grade)
 
       if (!result.success) {
         setError(result.error || '登録に失敗しました')
@@ -66,6 +68,54 @@ export default function RegisterPage() {
               {error}
             </div>
           )}
+
+          <div className={styles.formGroup}>
+            <label htmlFor="name" className={styles.label}>
+              氏名
+            </label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={styles.input}
+              placeholder="山田 太郎"
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label htmlFor="grade" className={styles.label}>
+              学年
+            </label>
+            <select
+              id="grade"
+              value={grade}
+              onChange={(e) => setGrade(e.target.value)}
+              className={styles.input}
+              required
+              disabled={loading}
+            >
+              <option value="">選択してください</option>
+              <option value="年少">年少</option>
+              <option value="年中">年中</option>
+              <option value="年長">年長</option>
+              <option value="小学1年">小学1年</option>
+              <option value="小学2年">小学2年</option>
+              <option value="小学3年">小学3年</option>
+              <option value="小学4年">小学4年</option>
+              <option value="小学5年">小学5年</option>
+              <option value="小学6年">小学6年</option>
+              <option value="中学1年">中学1年</option>
+              <option value="中学2年">中学2年</option>
+              <option value="中学3年">中学3年</option>
+              <option value="高校1年">高校1年</option>
+              <option value="高校2年">高校2年</option>
+              <option value="高校3年">高校3年</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
 
           <div className={styles.formGroup}>
             <label htmlFor="email" className={styles.label}>

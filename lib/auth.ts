@@ -1,4 +1,5 @@
-import { getUsersCollection, UserRole, UserProfile } from './db'
+import { getMembersCollection } from './db'
+import type { Member, UserRole } from './models'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
@@ -6,14 +7,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 export interface LoginResult {
   success: boolean
-  user?: Omit<UserProfile, 'password'>
+  user?: Omit<Member, 'password'>
   token?: string
   error?: string
 }
 
 export interface RegisterResult {
   success: boolean
-  user?: Omit<UserProfile, 'password'>
+  user?: Omit<Member, 'password'>
   token?: string
   error?: string
 }
@@ -46,10 +47,10 @@ export async function loginWithEmail(
   password: string
 ): Promise<LoginResult> {
   try {
-    const usersCollection = await getUsersCollection()
+    const membersCollection = await getMembersCollection()
 
-    // ユーザーを検索
-    const user = await usersCollection.findOne({ email: email.toLowerCase() })
+    // 会員を検索
+    const user = await membersCollection.findOne({ email: email.toLowerCase() })
 
     if (!user) {
       return {
@@ -102,13 +103,15 @@ export async function loginWithEmail(
  */
 export async function registerWithEmail(
   email: string,
-  password: string
+  password: string,
+  name: string,
+  grade: string
 ): Promise<RegisterResult> {
   try {
-    const usersCollection = await getUsersCollection()
+    const membersCollection = await getMembersCollection()
 
-    // 既存ユーザーのチェック
-    const existingUser = await usersCollection.findOne({ email: email.toLowerCase() })
+    // 既存会員のチェック
+    const existingUser = await membersCollection.findOne({ email: email.toLowerCase() })
 
     if (existingUser) {
       return {
@@ -120,15 +123,18 @@ export async function registerWithEmail(
     // パスワードをハッシュ化
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // ユーザーIDを生成
-    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    // 会員IDを生成
+    const userId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    // 新しいユーザーを作成
-    const newUser: UserProfile = {
+    // 新しい会員を作成
+    const newUser: Member = {
       id: userId,
       email: email.toLowerCase(),
       password: hashedPassword,
+      name,
+      grade,
       role: 'member',
+      status: 'active',
       is_active: true,
       is_deleted: false,
       created_at: new Date(),
@@ -136,7 +142,7 @@ export async function registerWithEmail(
     }
 
     // データベースに保存
-    await usersCollection.insertOne(newUser)
+    await membersCollection.insertOne(newUser)
 
     // トークンを生成
     const token = generateToken(newUser.id, newUser.email, newUser.role)
@@ -159,17 +165,17 @@ export async function registerWithEmail(
 }
 
 /**
- * 現在のユーザー情報を取得
+ * 現在の会員情報を取得
  */
-export async function getCurrentUser(token: string): Promise<Omit<UserProfile, 'password'> | null> {
+export async function getCurrentUser(token: string): Promise<Omit<Member, 'password'> | null> {
   try {
     const decoded = verifyToken(token)
     if (!decoded) {
       return null
     }
 
-    const usersCollection = await getUsersCollection()
-    const user = await usersCollection.findOne({ id: decoded.userId })
+    const membersCollection = await getMembersCollection()
+    const user = await membersCollection.findOne({ id: decoded.userId })
 
     if (!user || !user.is_active || user.is_deleted) {
       return null
@@ -184,12 +190,12 @@ export async function getCurrentUser(token: string): Promise<Omit<UserProfile, '
 }
 
 /**
- * ユーザー情報をIDで取得
+ * 会員情報をIDで取得
  */
-export async function getUserById(userId: string): Promise<Omit<UserProfile, 'password'> | null> {
+export async function getMemberById(userId: string): Promise<Omit<Member, 'password'> | null> {
   try {
-    const usersCollection = await getUsersCollection()
-    const user = await usersCollection.findOne({ id: userId })
+    const membersCollection = await getMembersCollection()
+    const user = await membersCollection.findOne({ id: userId })
 
     if (!user || !user.is_active || user.is_deleted) {
       return null

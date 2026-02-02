@@ -47,6 +47,17 @@
   padding: 48px 24px;
 }
 
+.section {
+  margin-top: 32px;
+}
+
+.sectionTitle {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #333;
+}
+
 .welcomeBox {
   background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
   border-radius: 16px;
@@ -153,4 +164,109 @@
   min-height: 100vh;
   font-size: 18px;
   color: #666;
+}
+
+.emptyMessage {
+  text-align: center;
+  padding: 24px;
+  color: #999;
+  font-size: 14px;
+}
+
+.classesList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.classCard {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.classHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.className {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.classDate {
+  font-size: 14px;
+  color: #666;
+}
+
+.classTime {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.classStats {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.quickButton {
+  padding: 10px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.quickButton:hover {
+  background: #5568d3;
+}
+
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+}
+
+.menuCard {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: center;
+}
+
+.menuCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.menuIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.menuTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.menuDescription {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
 }

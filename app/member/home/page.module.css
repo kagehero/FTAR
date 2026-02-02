@@ -115,3 +115,179 @@
   font-size: 18px;
   color: #666;
 }
+
+.ticketBox {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: white;
+}
+
+.ticketIcon {
+  font-size: 48px;
+}
+
+.ticketContent {
+  flex: 1;
+}
+
+.ticketTitle {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-bottom: 8px;
+}
+
+.ticketCount {
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.section {
+  margin-bottom: 48px;
+}
+
+.sectionTitle {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.badge {
+  background: #ff4444;
+  color: white;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.classesList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.classCard {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.classCard.unregistered {
+  border: 2px solid #ff6b6b;
+  background: #fff5f5;
+}
+
+.classHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.className {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.statusBadge {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.statusUnregistered {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.statusAttending {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.statusAbsent {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.classInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.classTime,
+.classVenue {
+  font-size: 14px;
+  color: #666;
+}
+
+.quickActionButton {
+  width: 100%;
+  padding: 10px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.quickActionButton:hover {
+  background: #5568d3;
+}
+
+.announcementsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.announcementCard {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.announcementTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.announcementContent {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.announcementDate {
+  font-size: 12px;
+  color: #999;
+}
+
+.emptyMessage {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 14px;
+}

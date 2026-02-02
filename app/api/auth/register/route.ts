@@ -4,11 +4,11 @@ import { registerWithEmail } from '@/lib/auth'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password } = body
+    const { email, password, name, grade } = body
 
-    if (!email || !password) {
+    if (!email || !password || !name || !grade) {
       return NextResponse.json(
-        { success: false, error: 'メールアドレスとパスワードを入力してください' },
+        { success: false, error: 'すべての項目を入力してください' },
         { status: 400 }
       )
     }
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = await registerWithEmail(email, password)
+    const result = await registerWithEmail(email, password, name, grade)
 
     if (!result.success) {
       return NextResponse.json(

@@ -63,11 +63,13 @@ export async function loginWithEmail(
 }
 
 /**
- * ユーザー登録
+ * 会員登録
  */
 export async function registerWithEmail(
   email: string,
-  password: string
+  password: string,
+  name: string,
+  grade: string
 ): Promise<RegisterResult> {
   try {
     const response = await fetch('/api/auth/register', {
@@ -75,7 +77,7 @@ export async function registerWithEmail(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, name, grade }),
     })
 
     const data = await response.json()

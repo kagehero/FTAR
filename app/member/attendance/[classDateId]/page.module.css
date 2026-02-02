@@ -1,0 +1,173 @@
+.container {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.content {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 32px;
+  color: #333;
+  text-align: center;
+}
+
+.classInfo {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.className {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.classDate {
+  font-size: 18px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.classTime {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.classVenue {
+  font-size: 14px;
+  color: #999;
+}
+
+.warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  color: #856404;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.errorMessage {
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 24px;
+  color: #c33;
+  font-size: 14px;
+}
+
+.statusSection {
+  margin-bottom: 32px;
+}
+
+.statusTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.currentStatus {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.buttons {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.statusButton {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.attendingButton {
+  background: #4caf50;
+  color: white;
+}
+
+.attendingButton:hover:not(:disabled) {
+  background: #45a049;
+}
+
+.absentButton {
+  background: #ff9800;
+  color: white;
+}
+
+.absentButton:hover:not(:disabled) {
+  background: #e68900;
+}
+
+.statusButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.note {
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+}
+
+.backButton {
+  width: 100%;
+  padding: 12px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.backButton:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.backButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loading,
+.error {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: #666;
+}
+
+.error {
+  color: #c33;
+}
