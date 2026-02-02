@@ -12,7 +12,7 @@ import { promoteWaitlistForClassDate } from '@/lib/services/waitlist-service'
 // 出欠登録
 export async function POST(
   request: NextRequest,
-  { params }: { params: { classDateId: string } }
+  context: { params: Promise<{ classDateId: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -32,6 +32,8 @@ export async function POST(
       )
     }
 
+    const { classDateId } = await context.params
+
     const body = await request.json()
     const { status } = body
 
@@ -41,8 +43,6 @@ export async function POST(
         { status: 400 }
       )
     }
-
-    const classDateId = params.classDateId
 
     // 開催日情報を取得
     const classDatesCollection = await getClassDatesCollection()

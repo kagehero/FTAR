@@ -12,7 +12,7 @@ import type { Attendance } from '@/lib/models'
 // 出欠名簿取得
 export async function GET(
   request: NextRequest,
-  { params }: { params: { classDateId: string } }
+  context: { params: Promise<{ classDateId: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -32,7 +32,7 @@ export async function GET(
       )
     }
 
-    const classDateId = params.classDateId
+    const { classDateId } = await context.params
 
     const classDatesCollection = await getClassDatesCollection()
     const classDate = await classDatesCollection.findOne({ id: classDateId })
@@ -139,7 +139,7 @@ export async function GET(
 // 出欠手動変更
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { classDateId: string } }
+  context: { params: Promise<{ classDateId: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -159,7 +159,7 @@ export async function PUT(
       )
     }
 
-    const classDateId = params.classDateId
+    const { classDateId } = await context.params
     const body = await request.json()
     const { memberId, status } = body
 

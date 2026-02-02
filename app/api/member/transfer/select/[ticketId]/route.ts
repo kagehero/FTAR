@@ -7,12 +7,13 @@ import {
   getAttendancesCollection,
   getWaitlistsCollection,
 } from '@/lib/db'
+import type { Attendance, Waitlist } from '@/lib/models'
 import { promoteWaitlistForClassDate } from '@/lib/services/waitlist-service'
 
 // 候補開催日の取得
 export async function GET(
   request: NextRequest,
-  { params }: { params: { ticketId: string } }
+  context: { params: Promise<{ ticketId: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -32,7 +33,7 @@ export async function GET(
       )
     }
 
-    const ticketId = params.ticketId
+    const { ticketId } = await context.params
     const ticketsCollection = await getTransferTicketsCollection()
     const classDatesCollection = await getClassDatesCollection()
     const classesCollection = await getClassesCollection()
@@ -131,7 +132,7 @@ export async function GET(
 // 振替先確定
 export async function POST(
   request: NextRequest,
-  { params }: { params: { ticketId: string } }
+  context: { params: Promise<{ ticketId: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -161,7 +162,7 @@ export async function POST(
       )
     }
 
-    const ticketId = params.ticketId
+    const { ticketId } = await context.params
     const ticketsCollection = await getTransferTicketsCollection()
     const classDatesCollection = await getClassDatesCollection()
     const classesCollection = await getClassesCollection()

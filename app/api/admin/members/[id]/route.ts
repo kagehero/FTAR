@@ -12,7 +12,7 @@ import {
 // 会員詳細取得
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -32,7 +32,7 @@ export async function GET(
       )
     }
 
-    const memberId = params.id
+    const { id: memberId } = await context.params
     const membersCollection = await getMembersCollection()
     const member = await membersCollection.findOne({ id: memberId })
 
@@ -134,7 +134,7 @@ export async function GET(
 // 会員情報更新
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -154,7 +154,7 @@ export async function PUT(
       )
     }
 
-    const memberId = params.id
+    const { id: memberId } = await context.params
     const body = await request.json()
     const { name, grade, phone, status, is_active } = body
 

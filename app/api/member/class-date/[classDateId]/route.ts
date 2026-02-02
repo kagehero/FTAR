@@ -8,7 +8,7 @@ import {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { classDateId: string } }
+  context: { params: Promise<{ classDateId: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -28,7 +28,7 @@ export async function GET(
       )
     }
 
-    const classDateId = params.classDateId
+    const { classDateId } = await context.params
 
     const classDatesCollection = await getClassDatesCollection()
     const classDate = await classDatesCollection.findOne({ id: classDateId })

@@ -4,7 +4,7 @@ import { getClassesCollection } from '@/lib/db'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -13,18 +13,20 @@ export async function PUT(
       return NextResponse.json({ success: false, error: '管理者権限が必要です' }, { status: 403 })
     }
 
+    const { id } = await context.params
+
     const body = await request.json()
     const { name, day_of_week, start_time, end_time, grade, category, capacity, venue, allow_transfer, is_active } =
       body
 
     const classesCollection = await getClassesCollection()
-    const classDoc = await classesCollection.findOne({ id: params.id })
+    const classDoc = await classesCollection.findOne({ id })
     if (!classDoc) {
       return NextResponse.json({ success: false, error: 'クラスが見つかりません' }, { status: 404 })
     }
 
     await classesCollection.updateOne(
-      { id: params.id },
+      { id },
       {
         $set: {
           name,
@@ -42,7 +44,7 @@ export async function PUT(
       },
     )
 
-    const updated = await classesCollection.findOne({ id: params.id })
+    const updated = await classesCollection.findOne({ id })
 
     return NextResponse.json({ success: true, class: updated })
   } catch (error) {
@@ -56,7 +58,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -65,14 +67,16 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: '管理者権限が必要です' }, { status: 403 })
     }
 
+    const { id } = await context.params
+
     const classesCollection = await getClassesCollection()
-    const classDoc = await classesCollection.findOne({ id: params.id })
+    const classDoc = await classesCollection.findOne({ id })
     if (!classDoc) {
       return NextResponse.json({ success: false, error: 'クラスが見つかりません' }, { status: 404 })
     }
 
     await classesCollection.updateOne(
-      { id: params.id },
+      { id },
       {
         $set: {
           is_active: false,

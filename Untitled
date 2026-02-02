@@ -1,7 +1,0 @@
-MONGODB_URI=mongodb://localhost:27017
-
-# データベース名
-MONGODB_DB=ftar
-
-# JWT秘密鍵（本番環境では強力なランダム文字列に変更してください）
-JWT_SECRET=your-secret-key-change-in-production
