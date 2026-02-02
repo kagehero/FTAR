@@ -11,7 +11,7 @@ import type { Attendance, TransferTicket } from '@/lib/models'
 // 開催日更新
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -31,7 +31,7 @@ export async function PUT(
       )
     }
 
-    const classDateId = params.id
+    const { id: classDateId } = await context.params
     const body = await request.json()
     const { isCancelled, cancelledReason, autoTransferTicket } = body
 
@@ -118,7 +118,7 @@ export async function PUT(
 // 開催日削除
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -138,7 +138,7 @@ export async function DELETE(
       )
     }
 
-    const classDateId = params.id
+    const { id: classDateId } = await context.params
     const classDatesCollection = await getClassDatesCollection()
 
     const result = await classDatesCollection.deleteOne({ id: classDateId })
