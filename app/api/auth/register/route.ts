@@ -5,6 +5,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, password, name, grade } = body
+    console.log('email', email)
+    console.log('password', password)
+    console.log('name', name)
+    console.log('grade', grade)
 
     if (!email || !password || !name || !grade) {
       return NextResponse.json(
