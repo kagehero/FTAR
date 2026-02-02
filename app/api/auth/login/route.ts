@@ -38,8 +38,23 @@ export async function POST(request: NextRequest) {
     return response
   } catch (error) {
     console.error('Login API error:', error)
+    const errorMessage = error instanceof Error ? error.message : '予期しないエラーが発生しました'
+    
+    // MongoDB接続エラーの場合は詳細を返す（開発環境のみ）
+    if (errorMessage.includes('MongoDB') || errorMessage.includes('MONGODB')) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: process.env.NODE_ENV === 'production' 
+            ? 'データベース接続エラーが発生しました。管理者にお問い合わせください。' 
+            : errorMessage 
+        },
+        { status: 500 }
+      )
+    }
+    
     return NextResponse.json(
-      { success: false, error: '予期しないエラーが発生しました' },
+      { success: false, error: errorMessage },
       { status: 500 }
     )
   }

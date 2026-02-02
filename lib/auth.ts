@@ -90,6 +90,16 @@ export async function loginWithEmail(
     }
   } catch (error) {
     console.error('Login error:', error)
+    const errorMessage = error instanceof Error ? error.message : '予期しないエラーが発生しました'
+    
+    // MongoDB接続エラーの場合
+    if (errorMessage.includes('MongoDB') || errorMessage.includes('MONGODB') || errorMessage.includes('環境変数')) {
+      return {
+        success: false,
+        error: 'データベース接続エラーが発生しました。管理者にお問い合わせください。',
+      }
+    }
+    
     return {
       success: false,
       error: '予期しないエラーが発生しました',
