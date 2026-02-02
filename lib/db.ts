@@ -15,7 +15,7 @@ let client: MongoClient | null = null
 let db: Db | null = null
 
 const MONGODB_URI = process.env.MONGODB_URI || ''
-const MONGODB_DB = process.env.MONGODB_DB || 'ftar'
+const MONGODB_DB = process.env.MONGODB_DB
 
 export async function connectToDatabase(): Promise<Db> {
   if (db) {
