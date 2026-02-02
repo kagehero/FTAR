@@ -22,6 +22,9 @@ export async function connectToDatabase(): Promise<Db> {
     return db
   }
 
+  console.log('MONGODB_URI', MONGODB_URI)
+  console.log('MONGODB_DB', MONGODB_DB)
+
   if (!MONGODB_URI) {
     throw new Error('MONGODB_URI環境変数が設定されていません')
   }
