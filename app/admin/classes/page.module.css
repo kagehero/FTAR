@@ -58,6 +58,25 @@
   color: #333;
 }
 
+.dayCheckboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.dayCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dayCheckbox input {
+  width: 18px;
+  height: 18px;
+}
+
 .error {
   background: #fee;
   border: 1px solid #fcc;

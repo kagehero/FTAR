@@ -27,7 +27,7 @@ export default function AdminClassesPage() {
   const [classes, setClasses] = useState<ClassItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<Partial<ClassItem>>({
+  const [form, setForm] = useState<Partial<ClassItem> & { daysOfWeek?: number[] }>({
     name: '',
     day_of_week: 1,
     start_time: '16:00',
@@ -37,6 +37,7 @@ export default function AdminClassesPage() {
     capacity: 20,
     venue: '',
     allow_transfer: true,
+    daysOfWeek: [1], // 複数曜日選択（編集時は未使用）
   })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -80,7 +81,7 @@ export default function AdminClassesPage() {
 
   const handleEdit = (cls: ClassItem) => {
     setEditingId(cls.id)
-    setForm(cls)
+    setForm({ ...cls, daysOfWeek: [cls.day_of_week] })
   }
 
   const resetForm = () => {
@@ -96,7 +97,22 @@ export default function AdminClassesPage() {
       venue: '',
       allow_transfer: true,
       is_active: true,
+      daysOfWeek: [1],
     })
+  }
+
+  const toggleDay = (day: number) => {
+    if (editingId) return
+    const current = form.daysOfWeek ?? [1]
+    const next = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b)
+    if (next.length === 0) return
+    setForm((prev) => ({
+      ...prev,
+      daysOfWeek: next,
+      day_of_week: next[0],
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,23 +120,63 @@ export default function AdminClassesPage() {
     setError('')
     setSaving(true)
     try {
-      const body = {
-        ...form,
-        capacity: Number(form.capacity) || 0,
-      }
-      const res = await fetch(
-        editingId ? `/api/admin/classes/${editingId}` : '/api/admin/classes',
-        {
-          method: editingId ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        },
-      )
-      const data = await res.json()
-      if (!data.success) {
-        setError(data.error || '保存に失敗しました')
+      const days = editingId
+        ? [form.day_of_week ?? 1]
+        : (form.daysOfWeek ?? [form.day_of_week ?? 1]).filter((d) => d >= 0)
+
+      if (days.length === 0) {
+        setError('曜日を1つ以上選択してください')
         setSaving(false)
         return
+      }
+
+      if (editingId) {
+        const body = {
+          ...form,
+          day_of_week: form.day_of_week ?? 1,
+          capacity: Number(form.capacity) || 0,
+        }
+        const res = await fetch(`/api/admin/classes/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (!data.success) {
+          setError(data.error || '保存に失敗しました')
+          setSaving(false)
+          return
+        }
+      } else {
+        let successCount = 0
+        let lastError = ''
+        for (const day of days) {
+          const body = {
+            name: form.name,
+            day_of_week: day,
+            start_time: form.start_time,
+            end_time: form.end_time,
+            grade: form.grade,
+            category: form.category,
+            capacity: Number(form.capacity) || 0,
+            venue: form.venue || '未設定',
+            allow_transfer: !!form.allow_transfer,
+          }
+          const res = await fetch('/api/admin/classes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          const data = await res.json()
+          if (data.success) successCount++
+          else lastError = data.error || ''
+        }
+        if (successCount < days.length) {
+          setError(lastError || `一部の登録に失敗しました（${successCount}/${days.length}件成功）`)
+          setSaving(false)
+          await loadData()
+          return
+        }
       }
       await loadData()
       resetForm()
@@ -182,20 +238,37 @@ export default function AdminClassesPage() {
               />
             </div>
             <div className={styles.formRow}>
-              <label className={styles.label}>曜日</label>
-              <select
-                className={styles.input}
-                value={form.day_of_week ?? 1}
-                onChange={(e) =>
-                  handleChange('day_of_week', Number(e.target.value))
-                }
-              >
-                {dayLabels.map((label, idx) => (
-                  <option key={idx} value={idx}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              <label className={styles.label}>
+                曜日{!editingId && '（複数選択可・一括登録）'}
+              </label>
+              {editingId ? (
+                <select
+                  className={styles.input}
+                  value={form.day_of_week ?? 1}
+                  onChange={(e) =>
+                    handleChange('day_of_week', Number(e.target.value))
+                  }
+                >
+                  {dayLabels.map((label, idx) => (
+                    <option key={idx} value={idx}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className={styles.dayCheckboxes}>
+                  {dayLabels.map((label, idx) => (
+                    <label key={idx} className={styles.dayCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={(form.daysOfWeek ?? [1]).includes(idx)}
+                        onChange={() => toggleDay(idx)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
             <div className={styles.formRowInline}>
               <div>
