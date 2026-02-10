@@ -21,6 +21,28 @@ interface ClassItem {
 
 const dayLabels = ['日', '月', '火', '水', '木', '金', '土']
 
+// カテゴリ（学年別）とそれに紐づく対象学年の選択肢
+const CATEGORY_OPTIONS = ['キッズ', '1年', '2年', '3年', '4年', '5年', '6年', 'その他'] as const
+
+const GRADE_BY_CATEGORY: Record<string, string[]> = {
+  キッズ: ['キッズ'],
+  '1年': ['1年', '1年スーパー'],
+  '2年': ['2年', '2年スーパー'],
+  '3年': ['3年', '3年A', '3年S', '特大'],
+  '4年': ['4年', '4年A', '4年S', '特大'],
+  '5年': ['5年', '5年A', '5年S', '特大'],
+  '6年': ['6年', '6年A', '6年S', '特待'],
+  その他: [],
+}
+
+// grade から category を逆引き（編集時用）
+function getCategoryFromGrade(grade: string): string {
+  for (const [cat, grades] of Object.entries(GRADE_BY_CATEGORY)) {
+    if (grades.includes(grade)) return cat
+  }
+  return grade ? 'その他' : ''
+}
+
 export default function AdminClassesPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -76,12 +98,33 @@ export default function AdminClassesPage() {
   }
 
   const handleChange = (field: keyof ClassItem, value: any) => {
-    setForm((prev) => ({ ...prev, [field]: value }))
+    setForm((prev) => {
+      const next = { ...prev, [field]: value }
+      if (field === 'category') {
+        const grades = GRADE_BY_CATEGORY[value as string] ?? []
+        next.grade = grades.length > 0 ? grades[0] : ''
+      }
+      return next
+    })
   }
 
   const handleEdit = (cls: ClassItem) => {
     setEditingId(cls.id)
-    setForm({ ...cls, daysOfWeek: [cls.day_of_week] })
+    const category =
+      cls.category && cls.category in GRADE_BY_CATEGORY
+        ? cls.category
+        : getCategoryFromGrade(cls.grade)
+    const grades = GRADE_BY_CATEGORY[category] ?? []
+    const grade =
+      grades.length > 0 && grades.includes(cls.grade)
+        ? cls.grade
+        : grades[0] ?? cls.grade
+    setForm({
+      ...cls,
+      category: category || '',
+      grade,
+      daysOfWeek: [cls.day_of_week],
+    })
   }
 
   const resetForm = () => {
@@ -188,7 +231,7 @@ export default function AdminClassesPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('このクラスを非アクティブにしますか？')) return
+    if (!confirm('このクラスを削除しますか？（無効化され、一覧から非表示になります）')) return
     try {
       const res = await fetch(`/api/admin/classes/${id}`, { method: 'DELETE' })
       const data = await res.json()
@@ -293,22 +336,50 @@ export default function AdminClassesPage() {
               </div>
             </div>
             <div className={styles.formRow}>
-              <label className={styles.label}>対象学年</label>
-              <input
-                className={styles.input}
-                value={form.grade || ''}
-                onChange={(e) => handleChange('grade', e.target.value)}
-                placeholder="例: 小学1〜3年"
-              />
-            </div>
-            <div className={styles.formRow}>
-              <label className={styles.label}>カテゴリ</label>
-              <input
+              <label className={styles.label}>カテゴリ（学年別）</label>
+              <select
                 className={styles.input}
                 value={form.category || ''}
                 onChange={(e) => handleChange('category', e.target.value)}
-                placeholder="例: 初心者, 上級"
-              />
+                required
+              >
+                <option value="">選択してください</option>
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.formRow}>
+              <label className={styles.label}>対象学年</label>
+              {!form.category ? (
+                <select className={styles.input} disabled>
+                  <option>カテゴリを選択してください</option>
+                </select>
+              ) : form.category === 'その他' ? (
+                <input
+                  className={styles.input}
+                  value={form.grade || ''}
+                  onChange={(e) => handleChange('grade', e.target.value)}
+                  placeholder="自由入力"
+                  required
+                />
+              ) : (
+                <select
+                  className={styles.input}
+                  value={form.grade || ''}
+                  onChange={(e) => handleChange('grade', e.target.value)}
+                  required
+                >
+                  <option value="">選択してください</option>
+                  {(GRADE_BY_CATEGORY[form.category] ?? []).map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className={styles.formRowInline}>
               <div>
@@ -421,10 +492,11 @@ export default function AdminClassesPage() {
                         編集
                       </button>
                       <button
-                        className={styles.linkButtonDanger}
+                        className={styles.deleteButton}
                         onClick={() => handleDelete(cls.id)}
+                        title="クラスを削除（無効化）"
                       >
-                        無効化
+                        削除
                       </button>
                     </td>
                   </tr>

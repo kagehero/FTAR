@@ -186,8 +186,7 @@
   border-bottom: none;
 }
 
-.linkButton,
-.linkButtonDanger {
+.linkButton {
   background: none;
   border: none;
   padding: 0;
@@ -195,10 +194,22 @@
   font-size: 12px;
   cursor: pointer;
   text-decoration: underline;
+  color: #667eea;
 }
 
-.linkButtonDanger {
+.deleteButton {
+  padding: 4px 10px;
+  margin-left: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 4px;
   color: #c62828;
+}
+
+.deleteButton:hover {
+  background: #fdd;
 }
 
 .emptyMessage {
