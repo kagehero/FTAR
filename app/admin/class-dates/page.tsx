@@ -7,17 +7,18 @@ import styles from './page.module.css'
 
 interface ClassDate {
   id: string
+  class_id: string
   date: string
   is_cancelled: boolean
   cancelled_reason?: string
   auto_transfer_ticket: boolean
-  class: {
+  class?: {
     id: string
     name: string
     day_of_week: number
     start_time: string
     end_time: string
-  }
+  } | null
 }
 
 export default function ClassDatesPage() {
@@ -211,39 +212,53 @@ export default function ClassDatesPage() {
               </tr>
             </thead>
             <tbody>
-              {classDates.map((cd) => (
-                <tr key={cd.id}>
-                  <td>{cd.class.name}</td>
-                  <td>{new Date(cd.date).toLocaleDateString('ja-JP')}</td>
-                  <td>{getDayName(cd.class.day_of_week)}</td>
-                  <td>
-                    {cd.class.start_time} - {cd.class.end_time}
-                  </td>
-                  <td>
-                    {cd.is_cancelled ? (
-                      <span className={styles.cancelledBadge}>中止</span>
-                    ) : (
-                      <span className={styles.activeBadge}>開催予定</span>
-                    )}
-                  </td>
-                  <td>
-                    <button
-                      className={styles.cancelButton}
-                      onClick={() => handleCancel(cd.id, cd.is_cancelled)}
-                    >
-                      {cd.is_cancelled ? '再開' : '中止'}
-                    </button>
-                    <button
-                      className={styles.attendanceButton}
-                      onClick={() =>
-                        router.push(`/admin/class/${cd.id}/attendance`)
-                      }
-                    >
-                      名簿
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {classDates.map((cd) => {
+                const classInfo =
+                  cd.class ??
+                  classes.find((cls) => cls.id === cd.class_id) ??
+                  null
+                return (
+                  <tr key={cd.id}>
+                    <td>{classInfo ? classInfo.name : '削除済みクラス'}</td>
+                    <td>{new Date(cd.date).toLocaleDateString('ja-JP')}</td>
+                    <td>
+                      {classInfo && typeof classInfo.day_of_week === 'number'
+                        ? getDayName(classInfo.day_of_week)
+                        : '-'}
+                    </td>
+                    <td>
+                      {classInfo
+                        ? `${classInfo.start_time} - ${classInfo.end_time}`
+                        : '-'}
+                    </td>
+                    <td>
+                      {cd.is_cancelled ? (
+                        <span className={styles.cancelledBadge}>中止</span>
+                      ) : (
+                        <span className={styles.activeBadge}>開催予定</span>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        className={styles.cancelButton}
+                        onClick={() => handleCancel(cd.id, cd.is_cancelled)}
+                      >
+                        {cd.is_cancelled ? '再開' : '中止'}
+                      </button>
+                      <button
+                        className={styles.attendanceButton}
+                        onClick={() =>
+                          router.push(`/admin/class/${cd.id}/attendance`)
+                        }
+                        disabled={!classInfo}
+                        title={classInfo ? '' : 'クラス情報が存在しません'}
+                      >
+                        名簿
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
