@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { registerWithEmail } from '@/lib/auth-client'
+import { GRADE_OPTIONS } from '@/lib/constants'
 import styles from './page.module.css'
 
 export default function RegisterPage() {
@@ -79,7 +80,7 @@ export default function RegisterPage() {
 
           <div className={styles.formGroup}>
             <label htmlFor="grade" className={styles.label}>
-              学年
+              対象学年
             </label>
             <select
               id="grade"
@@ -90,22 +91,11 @@ export default function RegisterPage() {
               disabled={loading}
             >
               <option value="">選択してください</option>
-              <option value="年少">年少</option>
-              <option value="年中">年中</option>
-              <option value="年長">年長</option>
-              <option value="小学1年">小学1年</option>
-              <option value="小学2年">小学2年</option>
-              <option value="小学3年">小学3年</option>
-              <option value="小学4年">小学4年</option>
-              <option value="小学5年">小学5年</option>
-              <option value="小学6年">小学6年</option>
-              <option value="中学1年">中学1年</option>
-              <option value="中学2年">中学2年</option>
-              <option value="中学3年">中学3年</option>
-              <option value="高校1年">高校1年</option>
-              <option value="高校2年">高校2年</option>
-              <option value="高校3年">高校3年</option>
-              <option value="その他">その他</option>
+              {GRADE_OPTIONS.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
             </select>
           </div>
 

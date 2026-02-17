@@ -118,6 +118,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const selectedDate = new Date(date)
+    const selectedDayOfWeek = selectedDate.getDay()
+    const classDayOfWeek = classInfo.day_of_week
+
+    if (selectedDayOfWeek !== classDayOfWeek) {
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土']
+      return NextResponse.json(
+        {
+          success: false,
+          error: `選択した日付は${dayNames[selectedDayOfWeek]}曜日です。このクラスは${dayNames[classDayOfWeek]}曜日のクラスです。`,
+        },
+        { status: 400 }
+      )
+    }
+
     const classDatesCollection = await getClassDatesCollection()
 
     // 既存チェック

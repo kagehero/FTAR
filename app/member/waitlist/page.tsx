@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth-client'
+import LoadingScreen from '@/components/LoadingScreen'
 import styles from './page.module.css'
 
 interface WaitlistEntry {
@@ -80,11 +81,7 @@ export default function WaitlistPage() {
   }
 
   if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>読み込み中...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (

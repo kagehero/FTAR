@@ -148,6 +148,57 @@
   pointer-events: none;
 }
 
+.deleteButton {
+  padding: 6px 12px;
+  margin-left: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  color: #c62828;
+}
+
+.deleteButton:hover {
+  background: #fdd;
+}
+
+.modalMessage {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.modalConfirmButton {
+  padding: 10px 20px;
+  background: #c62828;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.modalConfirmButton:hover {
+  background: #b71c1c;
+}
+
+.modalCancelButton {
+  padding: 10px 20px;
+  background: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.modalCancelButton:hover {
+  background: #e0e0e0;
+}
+
 .modalOverlay {
   position: fixed;
   top: 0;
@@ -201,6 +252,25 @@
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   font-size: 14px;
+}
+
+.dayCheckboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.dayCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+}
+
+.dayCheckbox input {
+  width: auto;
 }
 
 .modalActions {

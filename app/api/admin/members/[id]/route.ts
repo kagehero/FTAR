@@ -192,3 +192,63 @@ export async function PUT(
     )
   }
 }
+
+// 会員削除（ソフトデリート）
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const token = request.cookies.get('auth-token')?.value
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: '認証されていません' },
+        { status: 401 }
+      )
+    }
+
+    const user = await getCurrentUser(token)
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: '権限がありません' },
+        { status: 403 }
+      )
+    }
+
+    const { id: memberId } = await context.params
+
+    const membersCollection = await getMembersCollection()
+    const member = await membersCollection.findOne({ id: memberId })
+
+    if (!member) {
+      return NextResponse.json(
+        { success: false, error: '会員が見つかりません' },
+        { status: 404 }
+      )
+    }
+
+    await membersCollection.updateOne(
+      { id: memberId },
+      {
+        $set: {
+          is_deleted: true,
+          status: 'withdrawn',
+          is_active: false,
+          updated_at: new Date(),
+        },
+      }
+    )
+
+    return NextResponse.json({
+      success: true,
+      message: '会員を削除しました',
+    })
+  } catch (error) {
+    console.error('Delete member error:', error)
+    return NextResponse.json(
+      { success: false, error: '予期しないエラーが発生しました' },
+      { status: 500 }
+    )
+  }
+}

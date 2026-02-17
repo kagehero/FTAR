@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
+import LoadingScreen from '@/components/LoadingScreen'
 import styles from './page.module.css'
 
 interface Member {
@@ -54,81 +55,53 @@ export default function MemberDetailPage() {
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(false)
-  const [editName, setEditName] = useState('')
-  const [editGrade, setEditGrade] = useState('')
-  const [editPhone, setEditPhone] = useState('')
-  const [editStatus, setEditStatus] = useState('')
-  const [editIsActive, setEditIsActive] = useState(true)
+
+  const fetchData = async () => {
+    const currentUser = await getCurrentUser()
+    if (!currentUser || currentUser.role !== 'admin') {
+      router.push('/')
+      return
+    }
+    setUser(currentUser)
+
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) {
+          setMember(data.member)
+          setAttendances(data.attendances)
+          setTransfers(data.transfers)
+          setNotifications(data.notifications)
+        }
+      }
+    } catch (error) {
+      console.error('Fetch error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      const currentUser = await getCurrentUser()
-      if (!currentUser || currentUser.role !== 'admin') {
-        router.push('/')
-        return
-      }
-      setUser(currentUser)
-
-      try {
-        const res = await fetch(`/api/admin/members/${memberId}`)
-        if (res.ok) {
-          const data = await res.json()
-          if (data.success) {
-            setMember(data.member)
-            setAttendances(data.attendances)
-            setTransfers(data.transfers)
-            setNotifications(data.notifications)
-            setEditName(data.member.name)
-            setEditGrade(data.member.grade)
-            setEditPhone(data.member.phone || '')
-            setEditStatus(data.member.status)
-            setEditIsActive(data.member.is_active)
-          }
-        }
-      } catch (error) {
-        console.error('Fetch error:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchData()
   }, [memberId, router])
 
-  const handleSave = async () => {
-    try {
-      const res = await fetch(`/api/admin/members/${memberId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editName,
-          grade: editGrade,
-          phone: editPhone,
-          status: editStatus,
-          is_active: editIsActive,
-        }),
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        toast.success('会員情報を更新しました')
-        setEditing(false)
-        window.location.reload()
-      } else {
-        toast.error(data.error || '更新に失敗しました')
-      }
-    } catch (error) {
-      toast.error('エラーが発生しました')
+  const getStatusLabel = (status: string, isActive: boolean) => {
+    if (!isActive) return '無効'
+    switch (status) {
+      case 'active':
+        return '在籍'
+      case 'suspended':
+        return '休会'
+      case 'withdrawn':
+        return '退会'
+      default:
+        return status
     }
   }
 
   if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>読み込み中...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!member) {
@@ -153,130 +126,37 @@ export default function MemberDetailPage() {
       <main className={styles.main}>
         {/* 基本情報 */}
         <div className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>基本情報</h2>
-            {!editing ? (
-              <button
-                className={styles.editButton}
-                onClick={() => setEditing(true)}
-              >
-                編集
-              </button>
-            ) : (
-              <div className={styles.editActions}>
-                <button className={styles.saveButton} onClick={handleSave}>
-                  保存
-                </button>
-                <button
-                  className={styles.cancelButton}
-                  onClick={() => {
-                    setEditing(false)
-                    setEditName(member.name)
-                    setEditGrade(member.grade)
-                    setEditPhone(member.phone || '')
-                    setEditStatus(member.status)
-                    setEditIsActive(member.is_active)
-                  }}
-                >
-                  キャンセル
-                </button>
-              </div>
-            )}
+          <h2 className={styles.sectionTitle}>基本情報</h2>
+          <div className={styles.infoGrid}>
+            <div className={styles.infoItem}>
+              <span className={styles.infoLabel}>氏名</span>
+              <span className={styles.infoValue}>{member.name}</span>
+            </div>
+            <div className={styles.infoItem}>
+              <span className={styles.infoLabel}>メール</span>
+              <span className={styles.infoValue}>{member.email}</span>
+            </div>
+            <div className={styles.infoItem}>
+              <span className={styles.infoLabel}>学年</span>
+              <span className={styles.infoValue}>{member.grade}</span>
+            </div>
+            <div className={styles.infoItem}>
+              <span className={styles.infoLabel}>電話番号</span>
+              <span className={styles.infoValue}>{member.phone || '-'}</span>
+            </div>
+            <div className={styles.infoItem}>
+              <span className={styles.infoLabel}>状態</span>
+              <span className={styles.infoValue}>
+                {getStatusLabel(member.status, member.is_active)}
+              </span>
+            </div>
+            <div className={styles.infoItem}>
+              <span className={styles.infoLabel}>登録日</span>
+              <span className={styles.infoValue}>
+                {new Date(member.created_at).toLocaleDateString('ja-JP')}
+              </span>
+            </div>
           </div>
-
-          {editing ? (
-            <div className={styles.editForm}>
-              <div className={styles.formGroup}>
-                <label>氏名</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label>学年</label>
-                <select
-                  value={editGrade}
-                  onChange={(e) => setEditGrade(e.target.value)}
-                >
-                  <option value="年少">年少</option>
-                  <option value="年中">年中</option>
-                  <option value="年長">年長</option>
-                  <option value="小学1年">小学1年</option>
-                  <option value="小学2年">小学2年</option>
-                  <option value="小学3年">小学3年</option>
-                  <option value="小学4年">小学4年</option>
-                  <option value="小学5年">小学5年</option>
-                  <option value="小学6年">小学6年</option>
-                  <option value="中学1年">中学1年</option>
-                  <option value="中学2年">中学2年</option>
-                  <option value="中学3年">中学3年</option>
-                  <option value="高校1年">高校1年</option>
-                  <option value="高校2年">高校2年</option>
-                  <option value="高校3年">高校3年</option>
-                </select>
-              </div>
-              <div className={styles.formGroup}>
-                <label>電話番号</label>
-                <input
-                  type="tel"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label>状態</label>
-                <select
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value)}
-                >
-                  <option value="active">在籍</option>
-                  <option value="suspended">休会</option>
-                  <option value="withdrawn">退会</option>
-                </select>
-              </div>
-              <div className={styles.formGroup}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={editIsActive}
-                    onChange={(e) => setEditIsActive(e.target.checked)}
-                  />
-                  アクティブ
-                </label>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.infoGrid}>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>氏名</span>
-                <span className={styles.infoValue}>{member.name}</span>
-              </div>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>メール</span>
-                <span className={styles.infoValue}>{member.email}</span>
-              </div>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>学年</span>
-                <span className={styles.infoValue}>{member.grade}</span>
-              </div>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>電話番号</span>
-                <span className={styles.infoValue}>{member.phone || '-'}</span>
-              </div>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>状態</span>
-                <span className={styles.infoValue}>{member.status}</span>
-              </div>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>登録日</span>
-                <span className={styles.infoValue}>
-                  {new Date(member.created_at).toLocaleDateString('ja-JP')}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* 出席履歴 */}
@@ -355,6 +235,7 @@ export default function MemberDetailPage() {
             ))}
           </div>
         </div>
+
       </main>
     </div>
   )

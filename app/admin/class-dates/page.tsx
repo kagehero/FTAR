@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
+import LoadingScreen from '@/components/LoadingScreen'
 import styles from './page.module.css'
 
 const SESSION_STATUS_LABELS: Record<string, string> = {
@@ -40,54 +41,92 @@ export default function ClassDatesPage() {
   const [loading, setLoading] = useState(true)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [selectedClassId, setSelectedClassId] = useState('')
+  const [selectedClassName, setSelectedClassName] = useState('')
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number | ''>('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [createDate, setCreateDate] = useState('')
-  const [createClassId, setCreateClassId] = useState('')
+  const [createStartDate, setCreateStartDate] = useState('')
+  const [createEndDate, setCreateEndDate] = useState('')
+  const [createClassName, setCreateClassName] = useState('')
+  const [createDayOfWeek, setCreateDayOfWeek] = useState<number[]>([])
+
+  const dayLabels = ['日', '月', '火', '水', '木', '金', '土']
+  const activeClasses = classes.filter((cls) => cls.is_active !== false)
+  const uniqueClassNames = Array.from(new Set(activeClasses.map((c) => c.name))).sort()
+
+  const getClassesByName = (name: string) =>
+    activeClasses.filter((c) => c.name === name)
+
+  const resolveClassId = (name: string, day: number | '') => {
+    const candidates = getClassesByName(name)
+    if (candidates.length === 0) return ''
+    if (candidates.length === 1) return candidates[0].id
+    if (day === '') return ''
+    const found = candidates.find((c) => c.day_of_week === day)
+    return found ? found.id : ''
+  }
+
+  const resolveClassIds = (name: string, days: number[]) => {
+    const candidates = getClassesByName(name)
+    if (candidates.length === 0) return []
+    if (candidates.length === 1) return [candidates[0].id]
+    return days
+      .map((d) => candidates.find((c) => c.day_of_week === d)?.id)
+      .filter((id): id is string => !!id)
+  }
+
+  const toggleCreateDay = (day: number) => {
+    const candidates = getClassesByName(createClassName)
+    if (candidates.length <= 1) return
+    setCreateDayOfWeek((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => a - b)
+    )
+  }
   const [cancelModal, setCancelModal] = useState<{ id: string; isCancelled: boolean } | null>(null)
   const [cancelNote, setCancelNote] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<ClassDate | null>(null)
+
+  const fetchData = async () => {
+    const currentUser = await getCurrentUser()
+    if (!currentUser || currentUser.role !== 'admin') {
+      router.push('/')
+      return
+    }
+    setUser(currentUser)
+
+    try {
+      const [classesRes, datesRes] = await Promise.all([
+        fetch('/api/admin/classes'),
+        fetch('/api/admin/class-dates'),
+      ])
+
+      if (classesRes.ok) {
+        const classesData = await classesRes.json()
+        if (classesData.success) {
+          setClasses(classesData.classes)
+        }
+      }
+
+      if (datesRes.ok) {
+        const datesData = await datesRes.json()
+        if (datesData.success) {
+          setClassDates(datesData.classDates)
+        }
+      }
+    } catch (error) {
+      console.error('Fetch error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      const currentUser = await getCurrentUser()
-      if (!currentUser || currentUser.role !== 'admin') {
-        router.push('/')
-        return
-      }
-      setUser(currentUser)
-
-      try {
-        const [classesRes, datesRes] = await Promise.all([
-          fetch('/api/admin/classes'),
-          fetch('/api/admin/class-dates'),
-        ])
-
-        if (classesRes.ok) {
-          const classesData = await classesRes.json()
-          if (classesData.success) {
-            setClasses(classesData.classes)
-          }
-        }
-
-        if (datesRes.ok) {
-          const datesData = await datesRes.json()
-          if (datesData.success) {
-            setClassDates(datesData.classDates)
-          }
-        }
-      } catch (error) {
-        console.error('Fetch error:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchData()
   }, [router])
 
   const handleGenerate = async () => {
-    if (!selectedClassId || !startDate || !endDate) {
+    const classId = resolveClassId(selectedClassName, selectedDayOfWeek)
+    if (!classId || !startDate || !endDate) {
       toast.error('すべての項目を入力してください')
       return
     }
@@ -97,7 +136,7 @@ export default function ClassDatesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          classId: selectedClassId,
+          classId,
           startDate,
           endDate,
         }),
@@ -107,7 +146,9 @@ export default function ClassDatesPage() {
       if (data.success) {
         toast.success(`${data.count}件の開催日を生成しました`)
         setShowGenerateModal(false)
-        window.location.reload()
+        setSelectedClassName('')
+        setSelectedDayOfWeek('')
+        await fetchData()
       } else {
         toast.error(data.error || '生成に失敗しました')
       }
@@ -117,28 +158,46 @@ export default function ClassDatesPage() {
   }
 
   const handleCreate = async () => {
-    if (!createClassId || !createDate) {
-      toast.error('すべての項目を入力してください')
+    const candidates = getClassesByName(createClassName)
+    const classIds =
+      candidates.length === 1 ? [candidates[0].id] : resolveClassIds(createClassName, createDayOfWeek)
+
+    if (!createClassName || classIds.length === 0 || !createStartDate || !createEndDate) {
+      toast.error('すべての項目を入力してください（曜日を1つ以上選択）')
+      return
+    }
+    if (new Date(createStartDate) > new Date(createEndDate)) {
+      toast.error('開始日は終了日より前を指定してください')
       return
     }
 
     try {
-      const res = await fetch('/api/admin/class-dates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          classId: createClassId,
-          date: createDate,
-        }),
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        toast.success('開催日を作成しました')
+      let totalCount = 0
+      let lastError = ''
+      for (const classId of classIds) {
+        const res = await fetch('/api/admin/class-dates/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            classId,
+            startDate: createStartDate,
+            endDate: createEndDate,
+          }),
+        })
+        const data = await res.json()
+        if (data.success) totalCount += data.count
+        else lastError = data.error || ''
+      }
+      if (totalCount > 0) {
+        toast.success(`${totalCount}件の開催日を作成しました`)
         setShowCreateModal(false)
-        window.location.reload()
+        setCreateClassName('')
+        setCreateDayOfWeek([])
+        setCreateStartDate('')
+        setCreateEndDate('')
+        await fetchData()
       } else {
-        toast.error(data.error || '作成に失敗しました')
+        toast.error(lastError || '作成に失敗しました')
       }
     } catch (error) {
       toast.error('エラーが発生しました')
@@ -176,7 +235,7 @@ export default function ClassDatesPage() {
         toast.success('更新しました')
         setCancelModal(null)
         setCancelNote('')
-        window.location.reload()
+        await fetchData()
       } else {
         toast.error(data.error || '更新に失敗しました')
       }
@@ -190,12 +249,27 @@ export default function ClassDatesPage() {
     return days[day]
   }
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      const res = await fetch(`/api/admin/class-dates/${deleteTarget.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('開催日を削除しました')
+        setDeleteTarget(null)
+        await fetchData()
+      } else {
+        toast.error(data.error || '削除に失敗しました')
+      }
+    } catch (error) {
+      toast.error('エラーが発生しました')
+    }
+  }
+
   if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>読み込み中...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (
@@ -301,6 +375,13 @@ export default function ClassDatesPage() {
                           名簿
                         </span>
                       )}
+                      <button
+                        className={styles.deleteButton}
+                        onClick={() => setDeleteTarget(cd)}
+                        title="開催日を削除"
+                      >
+                        削除
+                      </button>
                     </td>
                   </tr>
                 )
@@ -311,25 +392,53 @@ export default function ClassDatesPage() {
 
         {/* 自動生成モーダル */}
         {showGenerateModal && (
-          <div className={styles.modalOverlay} onClick={() => setShowGenerateModal(false)}>
+          <div
+            className={styles.modalOverlay}
+            onClick={() => {
+              setShowGenerateModal(false)
+              setSelectedClassName('')
+              setSelectedDayOfWeek('')
+            }}
+          >
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
               <h2>開催日自動生成</h2>
               <div className={styles.formGroup}>
-                <label>クラス</label>
+                <label>クラス名</label>
                 <select
-                  value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  value={selectedClassName}
+                  onChange={(e) => {
+                    setSelectedClassName(e.target.value)
+                    setSelectedDayOfWeek('')
+                  }}
                 >
                   <option value="">選択してください</option>
-                  {classes
-                    .filter((cls) => cls.is_active !== false)
-                    .map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}（{cls.grade}）
-                      </option>
-                    ))}
+                  {uniqueClassNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
                 </select>
               </div>
+              {selectedClassName && getClassesByName(selectedClassName).length > 1 && (
+                <div className={styles.formGroup}>
+                  <label>曜日</label>
+                  <select
+                    value={selectedDayOfWeek}
+                    onChange={(e) =>
+                      setSelectedDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                  >
+                    <option value="">選択してください</option>
+                    {getClassesByName(selectedClassName)
+                      .sort((a, b) => a.day_of_week - b.day_of_week)
+                      .map((cls) => (
+                        <option key={cls.id} value={cls.day_of_week}>
+                          {dayLabels[cls.day_of_week]}曜日
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
               <div className={styles.formGroup}>
                 <label>開始日</label>
                 <input
@@ -348,7 +457,43 @@ export default function ClassDatesPage() {
               </div>
               <div className={styles.modalActions}>
                 <button onClick={handleGenerate}>生成</button>
-                <button onClick={() => setShowGenerateModal(false)}>キャンセル</button>
+                <button
+                  onClick={() => {
+                    setShowGenerateModal(false)
+                    setSelectedClassName('')
+                    setSelectedDayOfWeek('')
+                  }}
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 削除確認モーダル */}
+        {deleteTarget && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setDeleteTarget(null)}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <p className={styles.modalMessage}>
+                現在選択されている開催日を本当に削除しますか？
+              </p>
+              <div className={styles.modalActions}>
+                <button
+                  className={styles.modalConfirmButton}
+                  onClick={handleDelete}
+                >
+                  削除する
+                </button>
+                <button
+                  className={styles.modalCancelButton}
+                  onClick={() => setDeleteTarget(null)}
+                >
+                  キャンセル
+                </button>
               </div>
             </div>
           </div>
@@ -390,36 +535,83 @@ export default function ClassDatesPage() {
 
         {/* 手動作成モーダル */}
         {showCreateModal && (
-          <div className={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
+          <div
+            className={styles.modalOverlay}
+            onClick={() => {
+              setShowCreateModal(false)
+              setCreateClassName('')
+              setCreateDayOfWeek([])
+              setCreateStartDate('')
+              setCreateEndDate('')
+            }}
+          >
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
               <h2>開催日手動作成</h2>
               <div className={styles.formGroup}>
-                <label>クラス</label>
+                <label>クラス名</label>
                 <select
-                  value={createClassId}
-                  onChange={(e) => setCreateClassId(e.target.value)}
+                  value={createClassName}
+                  onChange={(e) => {
+                    setCreateClassName(e.target.value)
+                    setCreateDayOfWeek([])
+                  }}
                 >
                   <option value="">選択してください</option>
-                  {classes
-                    .filter((cls) => cls.is_active !== false)
-                    .map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}（{cls.grade}）
-                      </option>
-                    ))}
+                  {uniqueClassNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
                 </select>
               </div>
+              {createClassName && getClassesByName(createClassName).length > 1 && (
+                <div className={styles.formGroup}>
+                  <label>曜日（複数選択可）</label>
+                  <div className={styles.dayCheckboxes}>
+                    {getClassesByName(createClassName)
+                      .sort((a, b) => a.day_of_week - b.day_of_week)
+                      .map((cls) => (
+                        <label key={cls.id} className={styles.dayCheckbox}>
+                          <input
+                            type="checkbox"
+                            checked={createDayOfWeek.includes(cls.day_of_week)}
+                            onChange={() => toggleCreateDay(cls.day_of_week)}
+                          />
+                          <span>{dayLabels[cls.day_of_week]}曜日</span>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              )}
               <div className={styles.formGroup}>
-                <label>開催日</label>
+                <label>開始日</label>
                 <input
                   type="date"
-                  value={createDate}
-                  onChange={(e) => setCreateDate(e.target.value)}
+                  value={createStartDate}
+                  onChange={(e) => setCreateStartDate(e.target.value)}
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label>終了日</label>
+                <input
+                  type="date"
+                  value={createEndDate}
+                  onChange={(e) => setCreateEndDate(e.target.value)}
                 />
               </div>
               <div className={styles.modalActions}>
                 <button onClick={handleCreate}>作成</button>
-                <button onClick={() => setShowCreateModal(false)}>キャンセル</button>
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setCreateClassName('')
+                    setCreateDayOfWeek([])
+                    setCreateStartDate('')
+                    setCreateEndDate('')
+                  }}
+                >
+                  キャンセル
+                </button>
               </div>
             </div>
           </div>

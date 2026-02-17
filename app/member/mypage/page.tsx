@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, logout } from '@/lib/auth-client'
+import LoadingScreen from '@/components/LoadingScreen'
 import styles from './page.module.css'
 
 export default function MyPage() {
@@ -56,11 +57,7 @@ export default function MyPage() {
   }
 
   if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>読み込み中...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (

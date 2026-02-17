@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
+import { GRADE_OPTIONS } from '@/lib/constants'
+import LoadingScreen from '@/components/LoadingScreen'
 import styles from './page.module.css'
 
 interface Member {
@@ -24,6 +27,13 @@ export default function MembersPage() {
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Member | null>(null)
+  const [editTarget, setEditTarget] = useState<Member | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editGrade, setEditGrade] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editStatus, setEditStatus] = useState('')
+  const [editIsActive, setEditIsActive] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,6 +67,68 @@ export default function MembersPage() {
     fetchData()
   }, [router, search, gradeFilter, statusFilter])
 
+  const openEditModal = (member: Member) => {
+    setEditTarget(member)
+    setEditName(member.name)
+    setEditGrade(member.grade)
+    setEditPhone(member.phone || '')
+    setEditStatus(member.status)
+    setEditIsActive(member.is_active)
+  }
+
+  const handleEditSave = async () => {
+    if (!editTarget) return
+    try {
+      const res = await fetch(`/api/admin/members/${editTarget.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName,
+          grade: editGrade,
+          phone: editPhone,
+          status: editStatus,
+          is_active: editIsActive,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('会員情報を更新しました')
+        setEditTarget(null)
+        const target = editTarget
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.id === target.id
+              ? ({ ...m, name: editName, grade: editGrade, phone: editPhone, status: editStatus as 'active' | 'suspended' | 'withdrawn', is_active: editIsActive })
+              : m
+          )
+        )
+      } else {
+        toast.error(data.error || '更新に失敗しました')
+      }
+    } catch (error) {
+      toast.error('エラーが発生しました')
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      const res = await fetch(`/api/admin/members/${deleteTarget.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('会員を削除しました')
+        setDeleteTarget(null)
+        setMembers((prev) => prev.filter((m) => m.id !== deleteTarget.id))
+      } else {
+        toast.error(data.error || '削除に失敗しました')
+      }
+    } catch (error) {
+      toast.error('エラーが発生しました')
+    }
+  }
+
   const getStatusLabel = (status: string, isActive: boolean) => {
     if (!isActive) return '無効'
     switch (status) {
@@ -72,11 +144,7 @@ export default function MembersPage() {
   }
 
   if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>読み込み中...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (
@@ -105,21 +173,11 @@ export default function MembersPage() {
             className={styles.filterSelect}
           >
             <option value="">すべての学年</option>
-            <option value="年少">年少</option>
-            <option value="年中">年中</option>
-            <option value="年長">年長</option>
-            <option value="小学1年">小学1年</option>
-            <option value="小学2年">小学2年</option>
-            <option value="小学3年">小学3年</option>
-            <option value="小学4年">小学4年</option>
-            <option value="小学5年">小学5年</option>
-            <option value="小学6年">小学6年</option>
-            <option value="中学1年">中学1年</option>
-            <option value="中学2年">中学2年</option>
-            <option value="中学3年">中学3年</option>
-            <option value="高校1年">高校1年</option>
-            <option value="高校2年">高校2年</option>
-            <option value="高校3年">高校3年</option>
+            {GRADE_OPTIONS.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
           </select>
           <select
             value={statusFilter}
@@ -166,12 +224,27 @@ export default function MembersPage() {
                   </td>
                   <td>{new Date(member.created_at).toLocaleDateString('ja-JP')}</td>
                   <td>
-                    <button
-                      className={styles.detailButton}
-                      onClick={() => router.push(`/admin/members/${member.id}`)}
-                    >
-                      詳細
-                    </button>
+                    <div className={styles.actionButtons}>
+                      <button
+                        className={styles.detailButton}
+                        onClick={() => router.push(`/admin/members/${member.id}`)}
+                      >
+                        詳細
+                      </button>
+                      <button
+                        className={styles.editButton}
+                        onClick={() => openEditModal(member)}
+                      >
+                        編集
+                      </button>
+                      <button
+                        className={styles.deleteButton}
+                        onClick={() => setDeleteTarget(member)}
+                        title="会員を削除"
+                      >
+                        削除
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -181,6 +254,115 @@ export default function MembersPage() {
 
         {members.length === 0 && (
           <div className={styles.emptyMessage}>会員が見つかりません</div>
+        )}
+
+        {/* 編集モーダル */}
+        {editTarget && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setEditTarget(null)}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <h2 className={styles.modalTitle}>会員情報を編集</h2>
+              <div className={styles.editForm}>
+                <div className={styles.formGroup}>
+                  <label>氏名</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>対象学年</label>
+                  <select
+                    value={editGrade}
+                    onChange={(e) => setEditGrade(e.target.value)}
+                  >
+                    {GRADE_OPTIONS.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                    {editGrade && !(GRADE_OPTIONS as readonly string[]).includes(editGrade) && (
+                      <option value={editGrade}>{editGrade}</option>
+                    )}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>電話番号</label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>状態</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                  >
+                    <option value="active">在籍</option>
+                    <option value="suspended">休会</option>
+                    <option value="withdrawn">退会</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={editIsActive}
+                      onChange={(e) => setEditIsActive(e.target.checked)}
+                    />
+                    アクティブ
+                  </label>
+                </div>
+              </div>
+              <div className={styles.modalActions}>
+                <button
+                  className={styles.modalSaveButton}
+                  onClick={handleEditSave}
+                >
+                  保存
+                </button>
+                <button
+                  className={styles.modalCancelButton}
+                  onClick={() => setEditTarget(null)}
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 削除確認モーダル */}
+        {deleteTarget && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setDeleteTarget(null)}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <p className={styles.modalMessage}>
+                「{deleteTarget.name}」さんを本当に削除しますか？削除後は一覧に表示されなくなります。
+              </p>
+              <div className={styles.modalActions}>
+                <button
+                  className={styles.modalConfirmButton}
+                  onClick={handleDelete}
+                >
+                  削除する
+                </button>
+                <button
+                  className={styles.modalCancelButton}
+                  onClick={() => setDeleteTarget(null)}
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>

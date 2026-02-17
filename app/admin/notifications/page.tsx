@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
+import LoadingScreen from '@/components/LoadingScreen'
 import styles from './page.module.css'
 
 interface ClassDate {
@@ -38,41 +39,41 @@ export default function NotificationsPage() {
   const [notificationType, setNotificationType] = useState<'email' | 'line'>('email')
   const [history, setHistory] = useState<NotificationLog[]>([])
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const currentUser = await getCurrentUser()
-      if (!currentUser || currentUser.role !== 'admin') {
-        router.push('/')
-        return
-      }
-      setUser(currentUser)
-
-      try {
-        const [datesRes, historyRes] = await Promise.all([
-          fetch('/api/admin/class-dates?startDate=2024-01-01'),
-          fetch('/api/admin/notifications/history'),
-        ])
-
-        if (datesRes.ok) {
-          const datesData = await datesRes.json()
-          if (datesData.success) {
-            setClassDates(datesData.classDates)
-          }
-        }
-
-        if (historyRes.ok) {
-          const historyData = await historyRes.json()
-          if (historyData.success) {
-            setHistory(historyData.logs)
-          }
-        }
-      } catch (error) {
-        console.error('Fetch error:', error)
-      } finally {
-        setLoading(false)
-      }
+  const fetchData = async () => {
+    const currentUser = await getCurrentUser()
+    if (!currentUser || currentUser.role !== 'admin') {
+      router.push('/')
+      return
     }
+    setUser(currentUser)
 
+    try {
+      const [datesRes, historyRes] = await Promise.all([
+        fetch('/api/admin/class-dates?startDate=2024-01-01'),
+        fetch('/api/admin/notifications/history'),
+      ])
+
+      if (datesRes.ok) {
+        const datesData = await datesRes.json()
+        if (datesData.success) {
+          setClassDates(datesData.classDates)
+        }
+      }
+
+      if (historyRes.ok) {
+        const historyData = await historyRes.json()
+        if (historyData.success) {
+          setHistory(historyData.logs)
+        }
+      }
+    } catch (error) {
+      console.error('Fetch error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchData()
   }, [router])
 
@@ -106,7 +107,7 @@ export default function NotificationsPage() {
         setShowSendModal(false)
         setSubject('')
         setContent('')
-        window.location.reload()
+        await fetchData()
       } else {
         toast.error(data.error || '送信に失敗しました')
       }
@@ -116,11 +117,7 @@ export default function NotificationsPage() {
   }
 
   if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>読み込み中...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (

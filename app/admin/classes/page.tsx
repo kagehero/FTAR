@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { getCurrentUser, logout } from '@/lib/auth-client'
+import { GRADE_OPTIONS } from '@/lib/constants'
+import LoadingScreen from '@/components/LoadingScreen'
 import styles from './page.module.css'
 
 interface ClassItem {
@@ -22,18 +24,25 @@ interface ClassItem {
 
 const dayLabels = ['日', '月', '火', '水', '木', '金', '土']
 
-// カテゴリ（学年別）とそれに紐づく対象学年の選択肢
-const CATEGORY_OPTIONS = ['キッズ', '1年', '2年', '3年', '4年', '5年', '6年', 'その他'] as const
+// カテゴリ（クラス形態）
+const CATEGORY_OPTIONS = ['キッズ', '通常', 'スーパー強化', '特化', '特待', 'その他'] as const
 
 const GRADE_BY_CATEGORY: Record<string, string[]> = {
-  キッズ: ['キッズ'],
-  '1年': ['1年', '1年スーパー'],
-  '2年': ['2年', '2年スーパー'],
-  '3年': ['3年', '3年A', '3年S', '特大'],
-  '4年': ['4年', '4年A', '4年S', '特大'],
-  '5年': ['5年', '5年A', '5年S', '特大'],
-  '6年': ['6年', '6年A', '6年S', '特待'],
+  キッズ: ['年少・年中・年長', '年少', '年中', '年長'],
+  通常: ['U8', 'U10', 'U12'],
+  スーパー強化: ['S', 'A'],
+  特化: ['基礎特化', 'DF特化', 'キック特化', 'ドリブル特化'],
+  特待: ['特待'],
   その他: [],
+}
+
+function parseGrades(gradeStr: string): string[] {
+  if (!gradeStr) return []
+  return gradeStr.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
+function joinGrades(grades: string[]): string {
+  return grades.filter(Boolean).join(',')
 }
 
 // grade から category を逆引き（編集時用）
@@ -99,31 +108,30 @@ export default function AdminClassesPage() {
   }
 
   const handleChange = (field: keyof ClassItem, value: any) => {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value }
-      if (field === 'category') {
-        const grades = GRADE_BY_CATEGORY[value as string] ?? []
-        next.grade = grades.length > 0 ? grades[0] : ''
-      }
-      return next
-    })
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const toggleTargetGrade = (g: string) => {
+    const current = parseGrades(form.grade || '')
+    const next = current.includes(g)
+      ? current.filter((x) => x !== g)
+      : [...current, g].sort(
+          (a, b) => GRADE_OPTIONS.indexOf(a as any) - GRADE_OPTIONS.indexOf(b as any)
+        )
+    setForm((prev) => ({ ...prev, grade: joinGrades(next) }))
   }
 
   const handleEdit = (cls: ClassItem) => {
     setEditingId(cls.id)
+    const parsedGrades = parseGrades(cls.grade || '').filter((g) =>
+      GRADE_OPTIONS.includes(g as any)
+    )
     const category =
-      cls.category && cls.category in GRADE_BY_CATEGORY
-        ? cls.category
-        : getCategoryFromGrade(cls.grade)
-    const grades = GRADE_BY_CATEGORY[category] ?? []
-    const grade =
-      grades.length > 0 && grades.includes(cls.grade)
-        ? cls.grade
-        : grades[0] ?? cls.grade
+      cls.category && cls.category in GRADE_BY_CATEGORY ? cls.category : ''
     setForm({
       ...cls,
       category: category || '',
-      grade,
+      grade: parsedGrades.length > 0 ? joinGrades(parsedGrades) : cls.grade || '',
       daysOfWeek: [cls.day_of_week],
     })
   }
@@ -169,6 +177,13 @@ export default function AdminClassesPage() {
 
       if (days.length === 0) {
         toast.error('曜日を1つ以上選択してください')
+        setSaving(false)
+        return
+      }
+
+      const gradeStr = form.grade?.trim()
+      if (!gradeStr) {
+        toast.error('対象学年を1つ以上選択してください')
         setSaving(false)
         return
       }
@@ -252,11 +267,7 @@ export default function AdminClassesPage() {
   }
 
   if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>読み込み中...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (
@@ -341,7 +352,7 @@ export default function AdminClassesPage() {
               </div>
             </div>
             <div className={styles.formRow}>
-              <label className={styles.label}>カテゴリ（学年別）</label>
+              <label className={styles.label}>カテゴリ</label>
               <select
                 className={styles.input}
                 value={form.category || ''}
@@ -357,34 +368,19 @@ export default function AdminClassesPage() {
               </select>
             </div>
             <div className={styles.formRow}>
-              <label className={styles.label}>対象学年</label>
-              {!form.category ? (
-                <select className={styles.input} disabled>
-                  <option>カテゴリを選択してください</option>
-                </select>
-              ) : form.category === 'その他' ? (
-                <input
-                  className={styles.input}
-                  value={form.grade || ''}
-                  onChange={(e) => handleChange('grade', e.target.value)}
-                  placeholder="自由入力"
-                  required
-                />
-              ) : (
-                <select
-                  className={styles.input}
-                  value={form.grade || ''}
-                  onChange={(e) => handleChange('grade', e.target.value)}
-                  required
-                >
-                  <option value="">選択してください</option>
-                  {(GRADE_BY_CATEGORY[form.category] ?? []).map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <label className={styles.label}>対象学年（複数選択可）</label>
+              <div className={styles.gradeCheckboxes}>
+                {GRADE_OPTIONS.map((g) => (
+                  <label key={g} className={styles.gradeCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={parseGrades(form.grade || '').includes(g)}
+                      onChange={() => toggleTargetGrade(g)}
+                    />
+                    {g}
+                  </label>
+                ))}
+              </div>
             </div>
             <div className={styles.formRowInline}>
               <div>

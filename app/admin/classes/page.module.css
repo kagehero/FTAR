@@ -77,6 +77,25 @@
   height: 18px;
 }
 
+.gradeCheckboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.gradeCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.gradeCheckbox input {
+  width: 18px;
+  height: 18px;
+}
+
 .error {
   background: #fee;
   border: 1px solid #fcc;
