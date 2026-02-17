@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { getCurrentUser, logout } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -145,14 +146,12 @@ export default function AdminDashboardPage() {
                     <p className={styles.classStats}>
                       出席予定: {item.attending}名 ／ 欠席: {item.absent}名
                     </p>
-                    <button
+                    <Link
+                      href={`/admin/class/${item.classDate.id}/attendance`}
                       className={styles.quickButton}
-                      onClick={() =>
-                        router.push(`/admin/class/${item.classDate.id}/attendance`)
-                      }
                     >
                       出欠名簿を表示
-                    </button>
+                    </Link>
                   </div>
                 )
               })}

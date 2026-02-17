@@ -87,6 +87,15 @@
   color: #999;
 }
 
+.cancelledNotice {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fff3e0;
+  color: #e65100;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -114,6 +123,109 @@
   font-size: 32px;
   font-weight: 700;
   color: #333;
+}
+
+.coachList {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tapHint {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.studentRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 12px;
+  border-bottom: 1px solid #eee;
+  gap: 16px;
+  min-height: 60px;
+}
+
+.studentRow:last-child {
+  border-bottom: none;
+}
+
+.studentInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tapButtons {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tapBtn {
+  width: 52px;
+  height: 52px;
+  border: 3px solid #ddd;
+  border-radius: 12px;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tapBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tapAttend {
+  color: #2e7d32;
+  border-color: #c8e6c9;
+}
+.tapAttend:hover:not(:disabled) {
+  background: #e8f5e9;
+  border-color: #2e7d32;
+}
+.tapAttend.tapActive {
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
+}
+
+.tapAbsent {
+  color: #c62828;
+  border-color: #ffcdd2;
+}
+.tapAbsent:hover:not(:disabled) {
+  background: #ffebee;
+  border-color: #c62828;
+}
+.tapAbsent.tapActive {
+  background: #f44336;
+  color: white;
+  border-color: #f44336;
+}
+
+.tapWaiting {
+  color: #f57c00;
+  border-color: #ffe0b2;
+}
+.tapWaiting:hover:not(:disabled) {
+  background: #fff3e0;
+  border-color: #f57c00;
+}
+.tapWaiting.tapActive {
+  background: #ff9800;
+  color: white;
+  border-color: #ff9800;
 }
 
 .section {
@@ -167,10 +279,26 @@
   border-radius: 12px;
 }
 
+.waitlistList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.waitlistItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
 .waitPosition {
   font-size: 14px;
   color: #ff9800;
   font-weight: 500;
+  margin-left: auto;
 }
 
 .memberActions {
@@ -222,6 +350,10 @@
   }
 
   .section {
+    display: none;
+  }
+
+  .coachList {
     display: none;
   }
 

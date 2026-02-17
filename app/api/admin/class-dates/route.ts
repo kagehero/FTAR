@@ -140,6 +140,8 @@ export async function POST(request: NextRequest) {
       is_cancelled: isCancelled || false,
       cancelled_reason: cancelledReason || undefined,
       auto_transfer_ticket: autoTransferTicket || false,
+      session_status: isCancelled ? 'cancelled' : 'scheduled',
+      note: cancelledReason || undefined,
       created_at: new Date(),
       updated_at: new Date(),
     }

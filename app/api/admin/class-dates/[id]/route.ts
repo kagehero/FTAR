@@ -33,7 +33,7 @@ export async function PUT(
 
     const { id: classDateId } = await context.params
     const body = await request.json()
-    const { isCancelled, cancelledReason, autoTransferTicket } = body
+    const { isCancelled, cancelledReason, autoTransferTicket, sessionStatus, note } = body
 
     const classDatesCollection = await getClassDatesCollection()
     const classDate = await classDatesCollection.findOne({ id: classDateId })
@@ -46,7 +46,8 @@ export async function PUT(
     }
 
     const wasCancelled = classDate.is_cancelled
-    const nowCancelled = isCancelled || false
+    const nowCancelled =
+      sessionStatus === 'cancelled' || (isCancelled ?? sessionStatus === 'cancelled')
 
     // 中止処理
     if (!wasCancelled && nowCancelled) {
@@ -89,14 +90,19 @@ export async function PUT(
       }
     }
 
-    // 開催日情報を更新
+    const sessionStatusVal =
+      sessionStatus ?? (nowCancelled ? 'cancelled' : classDate.session_status ?? 'scheduled')
+    const noteVal = note ?? cancelledReason
+
     await classDatesCollection.updateOne(
       { id: classDateId },
       {
         $set: {
           is_cancelled: nowCancelled,
-          cancelled_reason: cancelledReason || undefined,
-          auto_transfer_ticket: autoTransferTicket || false,
+          cancelled_reason: noteVal || cancelledReason || undefined,
+          auto_transfer_ticket: autoTransferTicket ?? classDate.auto_transfer_ticket,
+          session_status: sessionStatusVal,
+          note: noteVal || undefined,
           updated_at: new Date(),
         },
       }

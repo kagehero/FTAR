@@ -1,7 +1,8 @@
 // データベースモデル定義
 
 export type UserRole = 'member' | 'admin'
-export type AttendanceStatus = 'unregistered' | 'attending' | 'absent'
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'holiday'
+export type AttendanceStatus = 'unregistered' | 'attending' | 'absent' | 'waiting'
 export type TicketStatus = 'unused' | 'used' | 'expired'
 export type WaitlistStatus = 'waiting' | 'confirmed' | 'expired'
 export type MemberStatus = 'active' | 'suspended' | 'withdrawn'
@@ -41,29 +42,32 @@ export interface Class {
   updated_at: Date
 }
 
-// 開催日
+// 開催日（class_sessions）
 export interface ClassDate {
   _id?: string
   id: string
   class_id: string
   date: Date // 開催日
-  is_cancelled: boolean // 中止フラグ
+  is_cancelled: boolean // 中止フラグ（後方互換）
   cancelled_reason?: string
-  auto_transfer_ticket: boolean // 中止時自動振替チケット発行
+  auto_transfer_ticket: boolean
+  session_status?: SessionStatus // scheduled=予定, completed=開催済, cancelled=雨天中止, holiday=休み
+  note?: string // 雨天中止時の理由など
   created_at: Date
   updated_at: Date
 }
 
-// 出欠
+// 出欠（attendance roster）
 export interface Attendance {
   _id?: string
   id: string
   member_id: string
   class_date_id: string
-  status: AttendanceStatus
-  registered_at: Date // 登録日時
-  changed_by?: string // 変更者ID（管理者手動変更時）
+  status: AttendanceStatus // attending=出席, absent=欠席, waiting=待ち
+  registered_at: Date
+  changed_by?: string
   notes?: string
+  checkin_time?: Date // チェックイン日時
   created_at: Date
   updated_at: Date
 }

@@ -9,26 +9,17 @@ interface Member {
   id: string
   name: string
   grade: string
-  email: string
+  email?: string
 }
 
-interface AttendanceData {
+interface StudentRow {
   member: Member
-  attendance: {
-    id: string
-    status: string
-    registered_at: string
-    changed_by?: string
-  }
+  status: 'attending' | 'absent' | 'waiting' | 'unregistered'
 }
 
 interface WaitlistData {
   member: Member
-  waitlist: {
-    id: string
-    position: number
-    status: string
-  }
+  waitlist: { id: string; position: number; status: string }
 }
 
 export default function AttendanceListPage() {
@@ -36,15 +27,13 @@ export default function AttendanceListPage() {
   const params = useParams()
   const classDateId = params.classDateId as string
 
-  const [user, setUser] = useState<any>(null)
   const [classInfo, setClassInfo] = useState<any>(null)
   const [classDate, setClassDate] = useState<any>(null)
-  const [attendances, setAttendances] = useState<AttendanceData[]>([])
-  const [absences, setAbsences] = useState<AttendanceData[]>([])
-  const [unregistered, setUnregistered] = useState<Member[]>([])
+  const [students, setStudents] = useState<StudentRow[]>([])
   const [waitlists, setWaitlists] = useState<WaitlistData[]>([])
   const [loading, setLoading] = useState(true)
-  const [editingMember, setEditingMember] = useState<string | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [isCancelled, setIsCancelled] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,7 +42,6 @@ export default function AttendanceListPage() {
         router.push('/')
         return
       }
-      setUser(currentUser)
 
       try {
         const res = await fetch(`/api/admin/class/${classDateId}/attendance`)
@@ -62,10 +50,27 @@ export default function AttendanceListPage() {
           if (data.success) {
             setClassInfo(data.class)
             setClassDate(data.classDate)
-            setAttendances(data.attendances)
-            setAbsences(data.absences)
-            setUnregistered(data.unregistered)
-            setWaitlists(data.waitlists)
+            setIsCancelled(
+              data.classDate?.is_cancelled ||
+                data.classDate?.session_status === 'cancelled'
+            )
+
+            const rows: StudentRow[] = []
+            data.attendances?.forEach((a: any) =>
+              rows.push({ member: a.member, status: 'attending' })
+            )
+            data.waitings?.forEach((w: any) =>
+              rows.push({ member: w.member, status: 'waiting' })
+            )
+            data.absences?.forEach((a: any) =>
+              rows.push({ member: a.member, status: 'absent' })
+            )
+            data.unregistered?.forEach((m: Member) =>
+              rows.push({ member: m, status: 'unregistered' })
+            )
+            rows.sort((a, b) => a.member.name.localeCompare(b.member.name))
+            setStudents(rows)
+            setWaitlists(data.waitlists || [])
           }
         }
       } catch (error) {
@@ -78,28 +83,36 @@ export default function AttendanceListPage() {
     fetchData()
   }, [classDateId, router])
 
-  const handleStatusChange = async (memberId: string, newStatus: 'attending' | 'absent') => {
+  const handleStatusChange = async (
+    memberId: string,
+    newStatus: 'attending' | 'absent' | 'waiting'
+  ) => {
+    if (isCancelled) return
+    setSaving(memberId)
     try {
       const res = await fetch(`/api/admin/class/${classDateId}/attendance`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ memberId, status: newStatus }),
       })
-
       const data = await res.json()
       if (data.success) {
-        window.location.reload()
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.member.id === memberId ? { ...s, status: newStatus } : s
+          )
+        )
       } else {
         alert(data.error || '更新に失敗しました')
       }
     } catch (error) {
       alert('エラーが発生しました')
+    } finally {
+      setSaving(null)
     }
   }
 
-  const handlePrint = () => {
-    window.print()
-  }
+  const handlePrint = () => window.print()
 
   if (loading) {
     return (
@@ -113,6 +126,13 @@ export default function AttendanceListPage() {
   const [hours, minutes] = classInfo?.start_time?.split(':') || [0, 0]
   if (classDateTime) {
     classDateTime.setHours(Number(hours), Number(minutes), 0, 0)
+  }
+
+  const counts = {
+    attending: students.filter((s) => s.status === 'attending').length,
+    absent: students.filter((s) => s.status === 'absent').length,
+    waiting: students.filter((s) => s.status === 'waiting').length,
+    unregistered: students.filter((s) => s.status === 'unregistered').length,
   }
 
   return (
@@ -143,116 +163,77 @@ export default function AttendanceListPage() {
           <p className={styles.classTime}>
             {classInfo?.start_time} - {classInfo?.end_time} @ {classInfo?.venue}
           </p>
+          {isCancelled && (
+            <div className={styles.cancelledNotice}>雨天中止のため出欠操作はできません</div>
+          )}
         </div>
 
         <div className={styles.stats}>
           <div className={styles.statItem}>
-            <span className={styles.statLabel}>出席</span>
-            <span className={styles.statValue}>{attendances.length}名</span>
+            <span className={styles.statLabel}>○ 出席</span>
+            <span className={styles.statValue}>{counts.attending}</span>
           </div>
           <div className={styles.statItem}>
-            <span className={styles.statLabel}>欠席</span>
-            <span className={styles.statValue}>{absences.length}名</span>
+            <span className={styles.statLabel}>× 欠席</span>
+            <span className={styles.statValue}>{counts.absent}</span>
+          </div>
+          <div className={styles.statItem}>
+            <span className={styles.statLabel}>△ 待ち</span>
+            <span className={styles.statValue}>{counts.waiting}</span>
           </div>
           <div className={styles.statItem}>
             <span className={styles.statLabel}>未登録</span>
-            <span className={styles.statValue}>{unregistered.length}名</span>
-          </div>
-          <div className={styles.statItem}>
-            <span className={styles.statLabel}>待ち</span>
-            <span className={styles.statValue}>{waitlists.length}名</span>
+            <span className={styles.statValue}>{counts.unregistered}</span>
           </div>
         </div>
 
-        {/* 出席者 */}
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>出席 ({attendances.length}名)</h3>
-          <div className={styles.memberList}>
-            {attendances.map((item) => (
-              <div key={item.member.id} className={styles.memberCard}>
-                <div className={styles.memberInfo}>
-                  <span className={styles.memberName}>{item.member.name}</span>
-                  <span className={styles.memberGrade}>{item.member.grade}</span>
-                </div>
-                <div className={styles.memberActions}>
-                  <button
-                    className={styles.changeButton}
-                    onClick={() => handleStatusChange(item.member.id, 'absent')}
-                  >
-                    欠席に変更
-                  </button>
-                </div>
+        <div className={styles.coachList}>
+          <p className={styles.tapHint}>タップで出欠を記録</p>
+          {students.map((row) => (
+            <div key={row.member.id} className={styles.studentRow}>
+              <div className={styles.studentInfo}>
+                <span className={styles.memberName}>{row.member.name}</span>
+                <span className={styles.memberGrade}>{row.member.grade}</span>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 欠席者 */}
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>欠席 ({absences.length}名)</h3>
-          <div className={styles.memberList}>
-            {absences.map((item) => (
-              <div key={item.member.id} className={styles.memberCard}>
-                <div className={styles.memberInfo}>
-                  <span className={styles.memberName}>{item.member.name}</span>
-                  <span className={styles.memberGrade}>{item.member.grade}</span>
-                </div>
-                <div className={styles.memberActions}>
-                  <button
-                    className={styles.changeButton}
-                    onClick={() => handleStatusChange(item.member.id, 'attending')}
-                  >
-                    出席に変更
-                  </button>
-                </div>
+              <div className={styles.tapButtons}>
+                <button
+                  className={`${styles.tapBtn} ${styles.tapAttend} ${row.status === 'attending' ? styles.tapActive : ''}`}
+                  onClick={() => handleStatusChange(row.member.id, 'attending')}
+                  disabled={isCancelled || saving === row.member.id}
+                  title="出席"
+                >
+                  ○
+                </button>
+                <button
+                  className={`${styles.tapBtn} ${styles.tapAbsent} ${row.status === 'absent' ? styles.tapActive : ''}`}
+                  onClick={() => handleStatusChange(row.member.id, 'absent')}
+                  disabled={isCancelled || saving === row.member.id}
+                  title="欠席"
+                >
+                  ×
+                </button>
+                <button
+                  className={`${styles.tapBtn} ${styles.tapWaiting} ${row.status === 'waiting' ? styles.tapActive : ''}`}
+                  onClick={() => handleStatusChange(row.member.id, 'waiting')}
+                  disabled={isCancelled || saving === row.member.id}
+                  title="待ち（遅刻予定等）"
+                >
+                  △
+                </button>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 未登録者 */}
-        {unregistered.length > 0 && (
-          <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>未登録 ({unregistered.length}名)</h3>
-            <div className={styles.memberList}>
-              {unregistered.map((member) => (
-                <div key={member.id} className={styles.memberCard}>
-                  <div className={styles.memberInfo}>
-                    <span className={styles.memberName}>{member.name}</span>
-                    <span className={styles.memberGrade}>{member.grade}</span>
-                  </div>
-                  <div className={styles.memberActions}>
-                    <button
-                      className={styles.changeButton}
-                      onClick={() => handleStatusChange(member.id, 'attending')}
-                    >
-                      出席に登録
-                    </button>
-                    <button
-                      className={styles.changeButton}
-                      onClick={() => handleStatusChange(member.id, 'absent')}
-                    >
-                      欠席に登録
-                    </button>
-                  </div>
-                </div>
-              ))}
             </div>
-          </div>
-        )}
+          ))}
+        </div>
 
-        {/* キャンセル待ち */}
         {waitlists.length > 0 && (
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>キャンセル待ち ({waitlists.length}名)</h3>
-            <div className={styles.memberList}>
+            <div className={styles.waitlistList}>
               {waitlists.map((item) => (
-                <div key={item.member.id} className={styles.memberCard}>
-                  <div className={styles.memberInfo}>
-                    <span className={styles.memberName}>{item.member.name}</span>
-                    <span className={styles.memberGrade}>{item.member.grade}</span>
-                    <span className={styles.waitPosition}>順番: {item.waitlist.position}</span>
-                  </div>
+                <div key={item.member.id} className={styles.waitlistItem}>
+                  <span className={styles.memberName}>{item.member.name}</span>
+                  <span className={styles.memberGrade}>{item.member.grade}</span>
+                  <span className={styles.waitPosition}>順番: {item.waitlist.position}</span>
                 </div>
               ))}
             </div>
@@ -281,38 +262,22 @@ export default function AttendanceListPage() {
                 <th className={styles.printThNo}>No</th>
                 <th className={styles.printThName}>氏名</th>
                 <th className={styles.printThGrade}>学年</th>
-                <th className={styles.printThCheck}>出席確認</th>
+                <th className={styles.printThCheck}>出席</th>
                 <th className={styles.printThNotes}>備考</th>
               </tr>
             </thead>
             <tbody>
-              {attendances.map((item, index) => (
-                <tr key={item.member.id}>
+              {students.map((row, index) => (
+                <tr key={row.member.id}>
                   <td className={styles.printTd}>{index + 1}</td>
-                  <td className={styles.printTd}>{item.member.name}</td>
-                  <td className={styles.printTd}>{item.member.grade}</td>
-                  <td className={styles.printTd}></td>
-                  <td className={styles.printTd}></td>
-                </tr>
-              ))}
-              {absences.map((item, index) => (
-                <tr key={item.member.id}>
-                  <td className={styles.printTd}>{attendances.length + index + 1}</td>
-                  <td className={styles.printTd}>{item.member.name}</td>
-                  <td className={styles.printTd}>{item.member.grade}</td>
-                  <td className={styles.printTd}></td>
-                  <td className={styles.printTd}>欠席</td>
-                </tr>
-              ))}
-              {unregistered.map((member, index) => (
-                <tr key={member.id}>
+                  <td className={styles.printTd}>{row.member.name}</td>
+                  <td className={styles.printTd}>{row.member.grade}</td>
                   <td className={styles.printTd}>
-                    {attendances.length + absences.length + index + 1}
+                    {row.status === 'attending' ? '○' : row.status === 'absent' ? '×' : row.status === 'waiting' ? '△' : ''}
                   </td>
-                  <td className={styles.printTd}>{member.name}</td>
-                  <td className={styles.printTd}>{member.grade}</td>
-                  <td className={styles.printTd}></td>
-                  <td className={styles.printTd}>未登録</td>
+                  <td className={styles.printTd}>
+                    {row.status === 'attending' ? '' : row.status === 'absent' ? '欠席' : row.status === 'waiting' ? '待ち' : '未'}
+                  </td>
                 </tr>
               ))}
             </tbody>

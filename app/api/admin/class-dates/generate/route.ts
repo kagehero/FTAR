@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
             date: new Date(currentDate),
             is_cancelled: false,
             auto_transfer_ticket: false,
+            session_status: 'scheduled',
             created_at: new Date(),
             updated_at: new Date(),
           }

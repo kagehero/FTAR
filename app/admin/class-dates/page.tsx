@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth-client'
 import styles from './page.module.css'
+
+const SESSION_STATUS_LABELS: Record<string, string> = {
+  scheduled: '予定',
+  completed: '開催済',
+  cancelled: '雨天中止',
+  holiday: '休み',
+}
 
 interface ClassDate {
   id: string
@@ -11,6 +19,8 @@ interface ClassDate {
   date: string
   is_cancelled: boolean
   cancelled_reason?: string
+  session_status?: string
+  note?: string
   auto_transfer_ticket: boolean
   class?: {
     id: string
@@ -34,6 +44,8 @@ export default function ClassDatesPage() {
   const [endDate, setEndDate] = useState('')
   const [createDate, setCreateDate] = useState('')
   const [createClassId, setCreateClassId] = useState('')
+  const [cancelModal, setCancelModal] = useState<{ id: string; isCancelled: boolean } | null>(null)
+  const [cancelNote, setCancelNote] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -133,23 +145,35 @@ export default function ClassDatesPage() {
   }
 
   const handleCancel = async (classDateId: string, isCancelled: boolean) => {
-    if (!confirm(isCancelled ? '開催を再開しますか？' : 'このクラスを中止しますか？')) {
+    if (isCancelled) {
+      doCancel(classDateId, false, '')
       return
     }
+    setCancelModal({ id: classDateId, isCancelled: false })
+    setCancelNote('雨天')
+  }
 
+  const doCancel = async (
+    classDateId: string,
+    isCancelled: boolean,
+    note: string
+  ) => {
     try {
       const res = await fetch(`/api/admin/class-dates/${classDateId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          isCancelled: !isCancelled,
+          isCancelled,
+          sessionStatus: isCancelled ? 'cancelled' : 'scheduled',
+          cancelledReason: note || undefined,
+          note: note || undefined,
           autoTransferTicket: true,
         }),
       })
-
       const data = await res.json()
       if (data.success) {
-        alert('更新しました')
+        setCancelModal(null)
+        setCancelNote('')
         window.location.reload()
       } else {
         alert(data.error || '更新に失敗しました')
@@ -232,29 +256,49 @@ export default function ClassDatesPage() {
                         : '-'}
                     </td>
                     <td>
-                      {cd.is_cancelled ? (
-                        <span className={styles.cancelledBadge}>中止</span>
-                      ) : (
-                        <span className={styles.activeBadge}>開催予定</span>
-                      )}
+                      <span
+                        className={
+                          (cd.session_status || (cd.is_cancelled ? 'cancelled' : 'scheduled')) ===
+                          'cancelled'
+                            ? styles.cancelledBadge
+                            : styles.activeBadge
+                        }
+                      >
+                        {SESSION_STATUS_LABELS[
+                          cd.session_status ||
+                            (cd.is_cancelled ? 'cancelled' : 'scheduled')
+                        ] || '予定'}
+                      </span>
                     </td>
                     <td>
                       <button
                         className={styles.cancelButton}
-                        onClick={() => handleCancel(cd.id, cd.is_cancelled)}
+                        onClick={() => {
+                          if (cd.is_cancelled) {
+                            doCancel(cd.id, false, '')
+                          } else {
+                            setCancelModal({ id: cd.id, isCancelled: false })
+                            setCancelNote('雨天')
+                          }
+                        }}
                       >
-                        {cd.is_cancelled ? '再開' : '中止'}
+                        {cd.is_cancelled ? '再開' : '雨天中止'}
                       </button>
-                      <button
-                        className={styles.attendanceButton}
-                        onClick={() =>
-                          router.push(`/admin/class/${cd.id}/attendance`)
-                        }
-                        disabled={!classInfo}
-                        title={classInfo ? '' : 'クラス情報が存在しません'}
-                      >
-                        名簿
-                      </button>
+                      {classInfo ? (
+                        <Link
+                          href={`/admin/class/${cd.id}/attendance`}
+                          className={styles.attendanceButton}
+                        >
+                          名簿
+                        </Link>
+                      ) : (
+                        <span
+                          className={`${styles.attendanceButton} ${styles.attendanceButtonDisabled}`}
+                          title="クラス情報が存在しません"
+                        >
+                          名簿
+                        </span>
+                      )}
                     </td>
                   </tr>
                 )
@@ -275,11 +319,13 @@ export default function ClassDatesPage() {
                   onChange={(e) => setSelectedClassId(e.target.value)}
                 >
                   <option value="">選択してください</option>
-                  {classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </option>
-                  ))}
+                  {classes
+                    .filter((cls) => cls.is_active !== false)
+                    .map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}（{cls.grade}）
+                      </option>
+                    ))}
                 </select>
               </div>
               <div className={styles.formGroup}>
@@ -306,6 +352,40 @@ export default function ClassDatesPage() {
           </div>
         )}
 
+        {/* 雨天中止モーダル */}
+        {cancelModal && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setCancelModal(null)}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <h2>雨天中止</h2>
+              <p className={styles.modalHint}>
+                備考を入力してください（例: 雨天、台風のため）
+              </p>
+              <div className={styles.formGroup}>
+                <label>備考</label>
+                <input
+                  type="text"
+                  value={cancelNote}
+                  onChange={(e) => setCancelNote(e.target.value)}
+                  placeholder="雨天"
+                />
+              </div>
+              <div className={styles.modalActions}>
+                <button
+                  onClick={() =>
+                    doCancel(cancelModal.id, true, cancelNote || '雨天')
+                  }
+                >
+                  中止にする
+                </button>
+                <button onClick={() => setCancelModal(null)}>キャンセル</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 手動作成モーダル */}
         {showCreateModal && (
           <div className={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
@@ -318,11 +398,13 @@ export default function ClassDatesPage() {
                   onChange={(e) => setCreateClassId(e.target.value)}
                 >
                   <option value="">選択してください</option>
-                  {classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </option>
-                  ))}
+                  {classes
+                    .filter((cls) => cls.is_active !== false)
+                    .map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}（{cls.grade}）
+                      </option>
+                    ))}
                 </select>
               </div>
               <div className={styles.formGroup}>

@@ -133,10 +133,19 @@
 .attendanceButton {
   background: #667eea;
   color: white;
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
 }
 
 .attendanceButton:hover {
   background: #5568d3;
+}
+
+.attendanceButtonDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .modalOverlay {
@@ -165,6 +174,12 @@
   font-weight: 600;
   margin-bottom: 24px;
   color: #333;
+}
+
+.modalHint {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
 }
 
 .formGroup {

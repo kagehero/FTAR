@@ -7,6 +7,7 @@ import {
   getMembersCollection,
   getWaitlistsCollection,
 } from '@/lib/db'
+import { GRADE_BY_CATEGORY } from '@/lib/constants'
 import type { Attendance } from '@/lib/models'
 
 // 出欠名簿取得
@@ -68,19 +69,36 @@ export async function GET(
       .find({ class_date_id: classDateId, status: 'absent' })
       .toArray()
 
-    // 未登録者（クラスに登録されている会員で出欠未登録）
-    const allMembers = await membersCollection
-      .find({ role: 'member', is_active: true, is_deleted: false })
+    // 待ち（遅刻予定・振替待ち等）
+    const waitings = await attendancesCollection
+      .find({ class_date_id: classDateId, status: 'waiting' })
       .toArray()
 
+    // 未登録者（カテゴリに該当する会員で出欠未登録）
+    let gradesInCategory = GRADE_BY_CATEGORY[classInfo.category]
+    if (!gradesInCategory || gradesInCategory.length === 0) {
+      gradesInCategory = [classInfo.grade]
+    }
+    const allMembers = await membersCollection
+      .find({
+        role: 'member',
+        is_active: true,
+        is_deleted: false,
+        grade: { $in: gradesInCategory },
+      })
+      .toArray()
+
+    const waitlistsData = await waitlistsCollection
+      .find({ class_date_id: classDateId })
+      .toArray()
     const registeredMemberIds = new Set([
       ...attendances.map((a) => a.member_id),
       ...absences.map((a) => a.member_id),
+      ...waitings.map((w) => w.member_id),
+      ...waitlistsData.map((w) => w.member_id),
     ])
 
-    const unregistered = allMembers.filter(
-      (m) => !registeredMemberIds.has(m.id) && m.grade === classInfo.grade
-    )
+    const unregistered = allMembers.filter((m) => !registeredMemberIds.has(m.id))
 
     // キャンセル待ち
     const waitlists = await waitlistsCollection
@@ -98,6 +116,9 @@ export async function GET(
     )
     const absenceMembers = await Promise.all(
       absences.map((a) => getMemberInfo(a.member_id))
+    )
+    const waitingMembers = await Promise.all(
+      waitings.map((w) => getMemberInfo(w.member_id))
     )
     const waitlistMembers = await Promise.all(
       waitlists.map((w) => getMemberInfo(w.member_id))
@@ -118,6 +139,12 @@ export async function GET(
         .map((m, i) => ({
           member: m,
           attendance: absences[i],
+        })),
+      waitings: waitingMembers
+        .filter((m) => m !== null)
+        .map((m, i) => ({
+          member: m,
+          attendance: waitings[i],
         })),
       unregistered: unregistered,
       waitlists: waitlistMembers
@@ -163,7 +190,7 @@ export async function PUT(
     const body = await request.json()
     const { memberId, status } = body
 
-    if (!memberId || !status || !['attending', 'absent'].includes(status)) {
+    if (!memberId || !status || !['attending', 'absent', 'waiting'].includes(status)) {
       return NextResponse.json(
         { success: false, error: '無効なパラメータです' },
         { status: 400 }
@@ -177,17 +204,19 @@ export async function PUT(
       class_date_id: classDateId,
     })
 
+    const now = new Date()
     const attendanceData: Attendance = {
       id:
         existing?.id ||
         `attendance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       member_id: memberId,
       class_date_id: classDateId,
-      status: status as 'attending' | 'absent',
-      registered_at: new Date(),
+      status: status as 'attending' | 'absent' | 'waiting',
+      registered_at: now,
       changed_by: user.id,
-      created_at: existing?.created_at || new Date(),
-      updated_at: new Date(),
+      checkin_time: status === 'attending' ? now : undefined,
+      created_at: existing?.created_at || now,
+      updated_at: now,
     }
 
     if (existing) {
