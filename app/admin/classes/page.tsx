@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser, logout } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -62,7 +63,7 @@ export default function AdminClassesPage() {
     daysOfWeek: [1], // 複数曜日選択（編集時は未使用）
   })
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [error, setError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<ClassItem | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -79,10 +80,10 @@ export default function AdminClassesPage() {
       if (data.success) {
         setClasses(data.classes)
       } else {
-        setError(data.error || 'クラス一覧の取得に失敗しました')
+        toast.error(data.error || 'クラス一覧の取得に失敗しました')
       }
     } catch (e) {
-      setError('予期しないエラーが発生しました')
+      toast.error('予期しないエラーが発生しました')
     } finally {
       setLoading(false)
     }
@@ -160,7 +161,6 @@ export default function AdminClassesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setSaving(true)
     try {
       const days = editingId
@@ -168,7 +168,7 @@ export default function AdminClassesPage() {
         : (form.daysOfWeek ?? [form.day_of_week ?? 1]).filter((d) => d >= 0)
 
       if (days.length === 0) {
-        setError('曜日を1つ以上選択してください')
+        toast.error('曜日を1つ以上選択してください')
         setSaving(false)
         return
       }
@@ -186,10 +186,11 @@ export default function AdminClassesPage() {
         })
         const data = await res.json()
         if (!data.success) {
-          setError(data.error || '保存に失敗しました')
+          toast.error(data.error || '保存に失敗しました')
           setSaving(false)
           return
         }
+        toast.success('クラスを更新しました')
       } else {
         let successCount = 0
         let lastError = ''
@@ -215,33 +216,38 @@ export default function AdminClassesPage() {
           else lastError = data.error || ''
         }
         if (successCount < days.length) {
-          setError(lastError || `一部の登録に失敗しました（${successCount}/${days.length}件成功）`)
+          toast.error(lastError || `一部の登録に失敗しました（${successCount}/${days.length}件成功）`)
           setSaving(false)
           await loadData()
           return
         }
+        toast.success(`${successCount}件のクラスを追加しました`)
       }
       await loadData()
       resetForm()
     } catch (e) {
-      setError('予期しないエラーが発生しました')
+      toast.error('予期しないエラーが発生しました')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('このクラスを削除しますか？（無効化され、一覧から非表示になります）')) return
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
     try {
-      const res = await fetch(`/api/admin/classes/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admin/classes/${deleteTarget.id}`, {
+        method: 'DELETE',
+      })
       const data = await res.json()
       if (!data.success) {
-        alert(data.error || '削除に失敗しました')
+        toast.error(data.error || '削除に失敗しました')
         return
       }
+      toast.success('クラスを削除しました')
+      setDeleteTarget(null)
       await loadData()
     } catch (e) {
-      alert('予期しないエラーが発生しました')
+      toast.error('予期しないエラーが発生しました')
     }
   }
 
@@ -269,7 +275,6 @@ export default function AdminClassesPage() {
           <h2 className={styles.sectionTitle}>
             {editingId ? 'クラス編集' : 'クラス追加'}
           </h2>
-          {error && <div className={styles.error}>{error}</div>}
           <form onSubmit={handleSubmit} className={styles.form}>
             <div className={styles.formRow}>
               <label className={styles.label}>クラス名</label>
@@ -493,8 +498,8 @@ export default function AdminClassesPage() {
                       </button>
                       <button
                         className={styles.deleteButton}
-                        onClick={() => handleDelete(cls.id)}
-                        title="クラスを削除（無効化）"
+                        onClick={() => setDeleteTarget(cls)}
+                        title="クラスを削除"
                       >
                         削除
                       </button>
@@ -505,6 +510,37 @@ export default function AdminClassesPage() {
             </table>
           )}
         </section>
+
+        {/* 削除確認モーダル */}
+        {deleteTarget && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setDeleteTarget(null)}
+          >
+            <div
+              className={styles.modal}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className={styles.modalMessage}>
+                現在選択されているクラスを本当に削除しますか？
+              </p>
+              <div className={styles.modalActions}>
+                <button
+                  className={styles.modalConfirmButton}
+                  onClick={handleDeleteConfirm}
+                >
+                  削除する
+                </button>
+                <button
+                  className={styles.modalCancelButton}
+                  onClick={() => setDeleteTarget(null)}
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

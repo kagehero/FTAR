@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -97,16 +98,17 @@ export default function AttendanceListPage() {
       })
       const data = await res.json()
       if (data.success) {
+        toast.success('出欠を更新しました')
         setStudents((prev) =>
           prev.map((s) =>
             s.member.id === memberId ? { ...s, status: newStatus } : s
           )
         )
       } else {
-        alert(data.error || '更新に失敗しました')
+        toast.error(data.error || '更新に失敗しました')
       }
     } catch (error) {
-      alert('エラーが発生しました')
+      toast.error('エラーが発生しました')
     } finally {
       setSaving(null)
     }

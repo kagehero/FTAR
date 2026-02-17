@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -87,7 +88,7 @@ export default function ClassDatesPage() {
 
   const handleGenerate = async () => {
     if (!selectedClassId || !startDate || !endDate) {
-      alert('すべての項目を入力してください')
+      toast.error('すべての項目を入力してください')
       return
     }
 
@@ -104,20 +105,20 @@ export default function ClassDatesPage() {
 
       const data = await res.json()
       if (data.success) {
-        alert(`${data.count}件の開催日を生成しました`)
+        toast.success(`${data.count}件の開催日を生成しました`)
         setShowGenerateModal(false)
         window.location.reload()
       } else {
-        alert(data.error || '生成に失敗しました')
+        toast.error(data.error || '生成に失敗しました')
       }
     } catch (error) {
-      alert('エラーが発生しました')
+      toast.error('エラーが発生しました')
     }
   }
 
   const handleCreate = async () => {
     if (!createClassId || !createDate) {
-      alert('すべての項目を入力してください')
+      toast.error('すべての項目を入力してください')
       return
     }
 
@@ -133,14 +134,14 @@ export default function ClassDatesPage() {
 
       const data = await res.json()
       if (data.success) {
-        alert('開催日を作成しました')
+        toast.success('開催日を作成しました')
         setShowCreateModal(false)
         window.location.reload()
       } else {
-        alert(data.error || '作成に失敗しました')
+        toast.error(data.error || '作成に失敗しました')
       }
     } catch (error) {
-      alert('エラーが発生しました')
+      toast.error('エラーが発生しました')
     }
   }
 
@@ -172,14 +173,15 @@ export default function ClassDatesPage() {
       })
       const data = await res.json()
       if (data.success) {
+        toast.success('更新しました')
         setCancelModal(null)
         setCancelNote('')
         window.location.reload()
       } else {
-        alert(data.error || '更新に失敗しました')
+        toast.error(data.error || '更新に失敗しました')
       }
     } catch (error) {
-      alert('エラーが発生しました')
+      toast.error('エラーが発生しました')
     }
   }
 

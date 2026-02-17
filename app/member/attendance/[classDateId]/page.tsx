@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -16,7 +17,6 @@ export default function AttendancePage() {
   const [currentStatus, setCurrentStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
   const [canRegister, setCanRegister] = useState(true)
 
   useEffect(() => {
@@ -60,7 +60,6 @@ export default function AttendancePage() {
   }, [classDateId, router])
 
   const handleSubmit = async (status: 'attending' | 'absent') => {
-    setError('')
     setSubmitting(true)
 
     try {
@@ -75,15 +74,15 @@ export default function AttendancePage() {
       const data = await res.json()
 
       if (!data.success) {
-        setError(data.error || '登録に失敗しました')
+        toast.error(data.error || '登録に失敗しました')
         setSubmitting(false)
         return
       }
 
-      // 成功したらホームに戻る
+      toast.success('出欠を登録しました')
       router.push('/member/home')
     } catch (error) {
-      setError('予期しないエラーが発生しました')
+      toast.error('予期しないエラーが発生しました')
       setSubmitting(false)
     }
   }
@@ -135,8 +134,6 @@ export default function AttendancePage() {
             変更が必要な場合は管理者にお問い合わせください。
           </div>
         )}
-
-        {error && <div className={styles.errorMessage}>{error}</div>}
 
         <div className={styles.statusSection}>
           <h3 className={styles.statusTitle}>出欠ステータス</h3>

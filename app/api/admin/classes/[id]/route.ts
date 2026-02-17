@@ -75,15 +75,7 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: 'クラスが見つかりません' }, { status: 404 })
     }
 
-    await classesCollection.updateOne(
-      { id },
-      {
-        $set: {
-          is_active: false,
-          updated_at: new Date(),
-        },
-      },
-    )
+    await classesCollection.deleteOne({ id })
 
     return NextResponse.json({ success: true })
   } catch (error) {

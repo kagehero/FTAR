@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -111,14 +112,14 @@ export default function MemberDetailPage() {
 
       const data = await res.json()
       if (data.success) {
-        alert('会員情報を更新しました')
+        toast.success('会員情報を更新しました')
         setEditing(false)
         window.location.reload()
       } else {
-        alert(data.error || '更新に失敗しました')
+        toast.error(data.error || '更新に失敗しました')
       }
     } catch (error) {
-      alert('エラーが発生しました')
+      toast.error('エラーが発生しました')
     }
   }
 

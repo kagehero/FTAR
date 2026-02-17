@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 import { registerWithEmail } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -13,22 +14,20 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [name, setName] = useState('')
   const [grade, setGrade] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
 
     // パスワード確認
     if (password !== confirmPassword) {
-      setError('パスワードが一致しません')
+      toast.error('パスワードが一致しません')
       return
     }
 
     // パスワードの長さチェック
     if (password.length < 6) {
-      setError('パスワードは6文字以上で入力してください')
+      toast.error('パスワードは6文字以上で入力してください')
       return
     }
 
@@ -38,18 +37,17 @@ export default function RegisterPage() {
       const result = await registerWithEmail(email, password, name, grade)
 
       if (!result.success) {
-        setError(result.error || '登録に失敗しました')
+        toast.error(result.error || '登録に失敗しました')
         setLoading(false)
         return
       }
 
       if (result.user) {
-        // 登録成功後、ログインページにリダイレクト
-        // または自動ログインして会員ホームにリダイレクト
+        toast.success('登録が完了しました')
         router.push('/member/home')
       }
     } catch (err) {
-      setError('予期しないエラーが発生しました')
+      toast.error('予期しないエラーが発生しました')
       setLoading(false)
     }
   }
@@ -63,12 +61,6 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          {error && (
-            <div className={styles.errorMessage}>
-              {error}
-            </div>
-          )}
-
           <div className={styles.formGroup}>
             <label htmlFor="name" className={styles.label}>
               氏名

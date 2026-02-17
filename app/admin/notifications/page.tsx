@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -77,12 +78,12 @@ export default function NotificationsPage() {
 
   const handleSend = async () => {
     if (!subject || !content) {
-      alert('件名と本文を入力してください')
+      toast.error('件名と本文を入力してください')
       return
     }
 
     if ((target === 'class' || target === 'absent') && !selectedClassDateId) {
-      alert('クラスを選択してください')
+      toast.error('クラスを選択してください')
       return
     }
 
@@ -101,16 +102,16 @@ export default function NotificationsPage() {
 
       const data = await res.json()
       if (data.success) {
-        alert(`${data.count}件の通知を送信しました`)
+        toast.success(`${data.count}件の通知を送信しました`)
         setShowSendModal(false)
         setSubject('')
         setContent('')
         window.location.reload()
       } else {
-        alert(data.error || '送信に失敗しました')
+        toast.error(data.error || '送信に失敗しました')
       }
     } catch (error) {
-      alert('エラーが発生しました')
+      toast.error('エラーが発生しました')
     }
   }
 

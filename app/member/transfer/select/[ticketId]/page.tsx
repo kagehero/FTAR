@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -33,7 +34,6 @@ export default function TransferSelectPage() {
   const [options, setOptions] = useState<TransferOption[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,12 +48,12 @@ export default function TransferSelectPage() {
         const res = await fetch(`/api/member/transfer/select/${ticketId}`)
         const data = await res.json()
         if (!data.success) {
-          setError(data.error || '候補の取得に失敗しました')
+          toast.error(data.error || '候補の取得に失敗しました')
         } else {
           setOptions(data.options)
         }
       } catch (e) {
-        setError('予期しないエラーが発生しました')
+        toast.error('予期しないエラーが発生しました')
       } finally {
         setLoading(false)
       }
@@ -63,7 +63,6 @@ export default function TransferSelectPage() {
   }, [router, ticketId])
 
   const handleSelect = async (classDateId: string) => {
-    setError('')
     setSubmitting(true)
 
     try {
@@ -75,15 +74,15 @@ export default function TransferSelectPage() {
 
       const data = await res.json()
       if (!data.success) {
-        setError(data.error || '振替に失敗しました')
+        toast.error(data.error || '振替に失敗しました')
         setSubmitting(false)
         return
       }
 
-      // 確定またはキャンセル待ち登録後、チケット一覧に戻る
+      toast.success('振替を登録しました')
       router.push('/member/transfer-tickets')
     } catch (e) {
-      setError('予期しないエラーが発生しました')
+      toast.error('予期しないエラーが発生しました')
       setSubmitting(false)
     }
   }
@@ -100,8 +99,6 @@ export default function TransferSelectPage() {
     <div className={styles.container}>
       <div className={styles.content}>
         <h1 className={styles.title}>振替先選択</h1>
-
-        {error && <div className={styles.errorMessage}>{error}</div>}
 
         {options.length === 0 ? (
           <div className={styles.emptyMessage}>現在、振替可能なクラスはありません</div>

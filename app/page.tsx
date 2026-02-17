@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 import { loginWithEmail } from '@/lib/auth-client'
 import styles from './page.module.css'
 
@@ -10,25 +11,23 @@ export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
 
     try {
       const result = await loginWithEmail(email, password)
 
       if (!result.success) {
-        setError(result.error || 'ログインに失敗しました')
+        toast.error(result.error || 'ログインに失敗しました')
         setLoading(false)
         return
       }
 
       if (result.user) {
-        // ロール別リダイレクト
+        toast.success('ログインしました')
         if (result.user.role === 'admin') {
           router.push('/admin/dashboard')
         } else {
@@ -36,7 +35,7 @@ export default function LoginPage() {
         }
       }
     } catch (err) {
-      setError('予期しないエラーが発生しました')
+      toast.error('予期しないエラーが発生しました')
       setLoading(false)
     }
   }
@@ -50,12 +49,6 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          {error && (
-            <div className={styles.errorMessage}>
-              {error}
-            </div>
-          )}
-
           <div className={styles.formGroup}>
             <label htmlFor="email" className={styles.label}>
               メールアドレス
