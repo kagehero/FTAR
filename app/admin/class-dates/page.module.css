@@ -46,6 +46,8 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -64,6 +66,195 @@
 
 .actionButton:hover {
   background: #5568d3;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 0;
+  margin-left: auto;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.viewToggleButton,
+.viewToggleActive {
+  padding: 10px 20px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  background: #f5f5f5;
+  color: #666;
+}
+
+.viewToggleButton:hover {
+  background: #eee;
+}
+
+.viewToggleActive {
+  background: #667eea;
+  color: white;
+}
+
+.calendarSection {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.calendarTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.calendarNavButton {
+  padding: 8px 16px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.calendarNavButton:hover {
+  background: #e0e0e0;
+}
+
+.calendarTodayButton {
+  display: block;
+  margin-bottom: 16px;
+  padding: 6px 12px;
+  background: #e3f2fd;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #1976d2;
+}
+
+.calendarTodayButton:hover {
+  background: #bbdefb;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: #e0e0e0;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.calendarWeekday {
+  background: #f5f5f5;
+  padding: 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+.calendarDayEmpty {
+  min-height: 100px;
+  background: #fafafa;
+}
+
+.calendarDay {
+  min-height: 100px;
+  background: white;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendarDayToday {
+  background: #e3f2fd;
+}
+
+.calendarDayNum {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.calendarDayEvents {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: auto;
+}
+
+.calendarEvent {
+  font-size: 11px;
+  padding: 4px 6px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.calendarEventName {
+  font-weight: 500;
+  color: #333;
+  flex-shrink: 0;
+}
+
+.calendarEventScheduled {
+  font-size: 10px;
+  color: #2e7d32;
+  background: #e8f5e9;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.calendarEventCancelled {
+  font-size: 10px;
+  color: #c62828;
+  background: #ffebee;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.calendarEventCompleted {
+  font-size: 10px;
+  color: #1565c0;
+  background: #e3f2fd;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.calendarEventHoliday {
+  font-size: 10px;
+  color: #616161;
+  background: #f5f5f5;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.calendarEventLink {
+  font-size: 10px;
+  color: #1976d2;
+  margin-left: auto;
+}
+
+.calendarEventLink:hover {
+  text-decoration: underline;
 }
 
 .tableContainer {

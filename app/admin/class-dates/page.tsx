@@ -85,6 +85,11 @@ export default function ClassDatesPage() {
   const [cancelModal, setCancelModal] = useState<{ id: string; isCancelled: boolean } | null>(null)
   const [cancelNote, setCancelNote] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ClassDate | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
 
   const fetchData = async () => {
     const currentUser = await getCurrentUser()
@@ -249,6 +254,58 @@ export default function ClassDatesPage() {
     return days[day]
   }
 
+  const getDateKey = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
+  const classDatesByDate = (() => {
+    const map = new Map<string, ClassDate[]>()
+    classDates.forEach((cd) => {
+      const key = getDateKey(new Date(cd.date))
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(cd)
+    })
+    return map
+  })()
+
+  const getCalendarWeeks = (month: Date) => {
+    const year = month.getFullYear()
+    const m = month.getMonth()
+    const first = new Date(year, m, 1)
+    const last = new Date(year, m + 1, 0)
+    const startDay = first.getDay()
+    const daysInMonth = last.getDate()
+    const weeks: (Date | null)[][] = []
+    let week: (Date | null)[] = []
+    for (let i = 0; i < startDay; i++) week.push(null)
+    for (let d = 1; d <= daysInMonth; d++) {
+      week.push(new Date(year, m, d))
+      if (week.length === 7) {
+        weeks.push(week)
+        week = []
+      }
+    }
+    if (week.length) {
+      while (week.length < 7) week.push(null)
+      weeks.push(week)
+    }
+    return weeks
+  }
+
+  const calendarWeeks = getCalendarWeeks(calendarMonth)
+  const monthLabel = `${calendarMonth.getFullYear()}年${calendarMonth.getMonth() + 1}月`
+  const prevMonth = () =>
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+  const nextMonth = () =>
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+  const goToToday = () => {
+    const d = new Date()
+    setCalendarMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+  }
+
   const handleDelete = async () => {
     if (!deleteTarget) return
     try {
@@ -297,8 +354,102 @@ export default function ClassDatesPage() {
           >
             ➕ 手動作成
           </button>
+          <div className={styles.viewToggle}>
+            <button
+              className={viewMode === 'list' ? styles.viewToggleActive : styles.viewToggleButton}
+              onClick={() => setViewMode('list')}
+            >
+              一覧
+            </button>
+            <button
+              className={viewMode === 'calendar' ? styles.viewToggleActive : styles.viewToggleButton}
+              onClick={() => setViewMode('calendar')}
+            >
+              カレンダー
+            </button>
+          </div>
         </div>
 
+        {viewMode === 'calendar' && (
+          <div className={styles.calendarSection}>
+            <div className={styles.calendarHeader}>
+              <button type="button" onClick={prevMonth} className={styles.calendarNavButton}>
+                ‹ 前月
+              </button>
+              <h2 className={styles.calendarTitle}>{monthLabel}</h2>
+              <button type="button" onClick={nextMonth} className={styles.calendarNavButton}>
+                翌月 ›
+              </button>
+            </div>
+            <button type="button" onClick={goToToday} className={styles.calendarTodayButton}>
+              今月
+            </button>
+            <div className={styles.calendarGrid}>
+              {dayLabels.map((label) => (
+                <div key={label} className={styles.calendarWeekday}>
+                  {label}
+                </div>
+              ))}
+              {calendarWeeks.flat().map((day, idx) => {
+                if (!day) {
+                  return <div key={`empty-${idx}`} className={styles.calendarDayEmpty} />
+                }
+                const key = getDateKey(day)
+                const datesOnDay = classDatesByDate.get(key) ?? []
+                const isToday =
+                  key === getDateKey(new Date())
+                return (
+                  <div
+                    key={key}
+                    className={`${styles.calendarDay} ${isToday ? styles.calendarDayToday : ''}`}
+                  >
+                    <span className={styles.calendarDayNum}>{day.getDate()}</span>
+                    <div className={styles.calendarDayEvents}>
+                      {datesOnDay.map((cd) => {
+                        const classInfo =
+                          cd.class ??
+                          classes.find((c) => c.id === cd.class_id) ??
+                          null
+                        const status =
+                          cd.session_status || (cd.is_cancelled ? 'cancelled' : 'scheduled')
+                        return (
+                          <div key={cd.id} className={styles.calendarEvent}>
+                            <span className={styles.calendarEventName}>
+                              {classInfo ? classInfo.name : '削除済み'}
+                            </span>
+                            <span
+                              className={
+                                status === 'cancelled'
+                                  ? styles.calendarEventCancelled
+                                  : status === 'completed'
+                                    ? styles.calendarEventCompleted
+                                    : status === 'holiday'
+                                      ? styles.calendarEventHoliday
+                                      : styles.calendarEventScheduled
+                              }
+                            >
+                              {SESSION_STATUS_LABELS[status] || status}
+                            </span>
+                            {classInfo && (
+                              <Link
+                                href={`/admin/class/${cd.id}/attendance`}
+                                className={styles.calendarEventLink}
+                              >
+                                名簿
+                              </Link>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'list' && (
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
@@ -389,6 +540,7 @@ export default function ClassDatesPage() {
             </tbody>
           </table>
         </div>
+        )}
 
         {/* 自動生成モーダル */}
         {showGenerateModal && (
