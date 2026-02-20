@@ -91,7 +91,7 @@ export async function GET(
     if (gradesToMatch.length === 0) {
       gradesToMatch = GRADE_BY_CATEGORY[classInfo.category] ?? [classInfo.grade].filter(Boolean)
     }
-    const gradesToMatchUnique = [...new Set(gradesToMatch)]
+    const gradesToMatchUnique = Array.from(new Set(gradesToMatch))
     const memberGrades =
       gradesToMatchUnique.length > 0
         ? gradesToMatchUnique
