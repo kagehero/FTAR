@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import sgMail from '@sendgrid/mail'
 import { getCurrentUser } from '@/lib/auth'
 import {
   getMembersCollection,
@@ -8,6 +9,13 @@ import {
   getNotificationLogsCollection,
 } from '@/lib/db'
 import type { NotificationLog } from '@/lib/models'
+
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY
+const SENDGRID_FROM = process.env.SENDGRID_FROM
+
+if (SENDGRID_API_KEY) {
+  sgMail.setApiKey(SENDGRID_API_KEY)
+}
 
 // メール配信
 export async function POST(request: NextRequest) {
@@ -87,31 +95,93 @@ export async function POST(request: NextRequest) {
         .toArray()
     }
 
-    // 通知ログを作成
-    const logs: NotificationLog[] = targetMembers.map((member) => ({
-      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      member_id: member.id,
-      type: type as 'email' | 'line',
-      subject,
-      content,
-      sent_at: new Date(),
-      status: 'sent',
-      created_at: new Date(),
-      updated_at: new Date(),
-    }))
+    if (!targetMembers.length) {
+      return NextResponse.json({
+        success: true,
+        message: '対象となる会員がいません',
+        count: 0,
+      })
+    }
+
+    if (type === 'email') {
+      if (!SENDGRID_API_KEY || !SENDGRID_FROM) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'メール送信設定が構成されていません（SENDGRID_API_KEY / SENDGRID_FROM）',
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    const now = new Date()
+    const logs: NotificationLog[] = []
+    let successCount = 0
+
+    if (type === 'email') {
+      // SendGrid でメール送信
+      const sendPromises = targetMembers.map(async (member) => {
+        const logBase: Omit<NotificationLog, 'status' | 'error_message'> = {
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          member_id: member.id,
+          type: 'email',
+          subject,
+          content,
+          sent_at: now,
+        }
+
+        try {
+          await sgMail.send({
+            to: member.email,
+            from: SENDGRID_FROM as string,
+            subject,
+            text: content,
+          })
+
+          logs.push({
+            ...logBase,
+            status: 'sent',
+          })
+          successCount += 1
+        } catch (error: any) {
+          console.error('SendGrid error:', error)
+          logs.push({
+            ...logBase,
+            status: 'failed',
+            error_message:
+              (error?.response?.body && JSON.stringify(error.response.body)) ||
+              error?.message ||
+              'SendGrid送信エラー',
+          })
+        }
+      })
+
+      await Promise.all(sendPromises)
+    } else {
+      // LINE等の他チャネルはまだ未実装だが、履歴のみ残す
+      targetMembers.forEach((member) => {
+        logs.push({
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          member_id: member.id,
+          type: type as 'email' | 'line',
+          subject,
+          content,
+          sent_at: now,
+          status: 'sent',
+        })
+        successCount += 1
+      })
+    }
 
     if (logs.length > 0) {
       await notificationLogsCollection.insertMany(logs)
     }
 
-    // 実際のメール送信はここで実装
-    // 例: nodemailer, SendGrid, AWS SES など
-    // 今回はログのみ記録
-
     return NextResponse.json({
       success: true,
-      message: `${targetMembers.length}件の通知を送信しました`,
-      count: targetMembers.length,
+      message: `${successCount}件の通知を送信しました`,
+      count: successCount,
     })
   } catch (error) {
     console.error('Send notification error:', error)

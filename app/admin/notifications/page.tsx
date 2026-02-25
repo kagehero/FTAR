@@ -38,6 +38,10 @@ export default function NotificationsPage() {
   const [content, setContent] = useState('')
   const [notificationType, setNotificationType] = useState<'email' | 'line'>('email')
   const [history, setHistory] = useState<NotificationLog[]>([])
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'sent' | 'failed'>('all')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'email' | 'line'>('all')
+  const [deleteTarget, setDeleteTarget] = useState<NotificationLog | null>(null)
 
   const fetchData = async () => {
     const currentUser = await getCurrentUser()
@@ -76,6 +80,43 @@ export default function NotificationsPage() {
   useEffect(() => {
     fetchData()
   }, [router])
+
+  const filteredHistory = history.filter((log) => {
+    if (statusFilter !== 'all' && log.status !== statusFilter) return false
+    if (typeFilter !== 'all' && log.type !== typeFilter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      const subjectText = (log.subject || '').toLowerCase()
+      const contentText = (log.content || '').toLowerCase()
+      if (!subjectText.includes(q) && !contentText.includes(q)) return false
+    }
+    return true
+  })
+
+  const totalCount = filteredHistory.length
+  const sentCount = filteredHistory.filter((l) => l.status === 'sent').length
+  const failedCount = filteredHistory.filter((l) => l.status === 'failed').length
+  const emailCount = filteredHistory.filter((l) => l.type === 'email').length
+  const lineCount = filteredHistory.filter((l) => l.type === 'line').length
+
+  const handleDeleteLog = async () => {
+    if (!deleteTarget) return
+    try {
+      const res = await fetch(`/api/admin/notifications/${deleteTarget.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('通知ログを削除しました')
+        setDeleteTarget(null)
+        setHistory((prev) => prev.filter((log) => log.id !== deleteTarget.id))
+      } else {
+        toast.error(data.error || '削除に失敗しました')
+      }
+    } catch (error) {
+      toast.error('エラーが発生しました')
+    }
+  }
 
   const handleSend = async () => {
     if (!subject || !content) {
@@ -140,8 +181,57 @@ export default function NotificationsPage() {
       <main className={styles.main}>
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>送信履歴</h2>
+          <div className={styles.historyControls}>
+            <input
+              type="text"
+              placeholder="件名・本文で検索"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={styles.searchInput}
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className={styles.filterSelect}
+            >
+              <option value="all">すべてのステータス</option>
+              <option value="sent">送信済み</option>
+              <option value="failed">送信失敗</option>
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as any)}
+              className={styles.filterSelect}
+            >
+              <option value="all">すべての種類</option>
+              <option value="email">メール</option>
+              <option value="line">LINE</option>
+            </select>
+          </div>
+
+          <div className={styles.statsGrid}>
+            <div className={styles.statCard}>
+              <div className={styles.statLabel}>件数（表示中）</div>
+              <div className={styles.statValue}>{totalCount}</div>
+            </div>
+            <div className={styles.statCard}>
+              <div className={styles.statLabel}>送信済み</div>
+              <div className={styles.statValue}>{sentCount}</div>
+            </div>
+            <div className={styles.statCard}>
+              <div className={styles.statLabel}>送信失敗</div>
+              <div className={styles.statValue}>{failedCount}</div>
+            </div>
+            <div className={styles.statCard}>
+              <div className={styles.statLabel}>メール / LINE</div>
+              <div className={styles.statValue}>
+                {emailCount} / {lineCount}
+              </div>
+            </div>
+          </div>
+
           <div className={styles.historyList}>
-            {history.map((log) => (
+            {filteredHistory.map((log) => (
               <div key={log.id} className={styles.historyItem}>
                 <div className={styles.historyInfo}>
                   <span className={styles.historyDate}>
@@ -151,15 +241,27 @@ export default function NotificationsPage() {
                     {log.type === 'email' ? '📧' : '💬'} {log.subject || log.content}
                   </span>
                 </div>
-                <span
-                  className={
-                    log.status === 'sent' ? styles.statusSent : styles.statusFailed
-                  }
-                >
-                  {log.status === 'sent' ? '送信済み' : '送信失敗'}
-                </span>
+                <div className={styles.historyActions}>
+                  <span
+                    className={
+                      log.status === 'sent' ? styles.statusSent : styles.statusFailed
+                    }
+                  >
+                    {log.status === 'sent' ? '送信済み' : '送信失敗'}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.deleteButton}
+                    onClick={() => setDeleteTarget(log)}
+                  >
+                    削除
+                  </button>
+                </div>
               </div>
             ))}
+            {filteredHistory.length === 0 && (
+              <div className={styles.emptyHistory}>条件に一致する履歴がありません</div>
+            )}
           </div>
         </div>
 
@@ -227,6 +329,33 @@ export default function NotificationsPage() {
               <div className={styles.modalActions}>
                 <button onClick={handleSend}>送信</button>
                 <button onClick={() => setShowSendModal(false)}>キャンセル</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 削除確認モーダル */}
+        {deleteTarget && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setDeleteTarget(null)}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <h2>通知ログの削除</h2>
+              <p className={styles.modalMessage}>
+                以下の通知ログを削除しますか？この操作は取り消せません。
+              </p>
+              <p className={styles.modalLogPreview}>
+                {deleteTarget.type === 'email' ? '📧' : '💬'}{' '}
+                {deleteTarget.subject || deleteTarget.content}
+                <br />
+                <span className={styles.historyDate}>
+                  {new Date(deleteTarget.sent_at).toLocaleString('ja-JP')}
+                </span>
+              </p>
+              <div className={styles.modalActions}>
+                <button onClick={handleDeleteLog}>削除する</button>
+                <button onClick={() => setDeleteTarget(null)}>キャンセル</button>
               </div>
             </div>
           </div>
