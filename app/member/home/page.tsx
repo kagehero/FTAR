@@ -147,6 +147,12 @@ export default function MemberHomePage() {
             <h3 className={styles.ticketTitle}>振替チケット残数</h3>
             <p className={styles.ticketCount}>{ticketCount}枚</p>
           </div>
+          <button
+            className={styles.ticketLinkButton}
+            onClick={() => router.push('/member/transfer-tickets')}
+          >
+            振替チケット一覧へ
+          </button>
         </div>
 
         {/* 本日の予定 */}

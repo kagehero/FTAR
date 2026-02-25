@@ -153,8 +153,8 @@
 
 .submitButton {
   padding: 10px 16px;
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
   border: none;
   border-radius: 6px;
   font-size: 14px;
@@ -163,7 +163,7 @@
 }
 
 .submitButton:hover {
-  background: #5568d3;
+  background: var(--color-primary-hover);
 }
 
 .cancelButton {
@@ -213,7 +213,7 @@
   font-size: 12px;
   cursor: pointer;
   text-decoration: underline;
-  color: #667eea;
+  color: var(--color-primary);
 }
 
 .deleteButton {

@@ -71,8 +71,8 @@
 }
 
 .filterActive {
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
 }
 
 .tableContainer {

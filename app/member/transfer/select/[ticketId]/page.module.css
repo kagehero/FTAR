@@ -99,8 +99,8 @@
   margin-top: 8px;
   width: 100%;
   padding: 12px;
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -110,7 +110,7 @@
 }
 
 .selectButton:hover:not(:disabled) {
-  background: #5568d3;
+  background: var(--color-primary-hover);
 }
 
 .selectButton:disabled {

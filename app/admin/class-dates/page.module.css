@@ -54,8 +54,8 @@
 
 .actionButton {
   padding: 12px 24px;
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -65,7 +65,7 @@
 }
 
 .actionButton:hover {
-  background: #5568d3;
+  background: var(--color-primary-hover);
 }
 
 .viewToggle {
@@ -92,8 +92,8 @@
 }
 
 .viewToggleActive {
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
 }
 
 .calendarSection {
@@ -322,15 +322,15 @@
 }
 
 .attendanceButton {
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
   display: inline-block;
   text-decoration: none;
   text-align: center;
 }
 
 .attendanceButton:hover {
-  background: #5568d3;
+  background: var(--color-primary-hover);
 }
 
 .attendanceButtonDisabled {
@@ -481,12 +481,12 @@
 }
 
 .modalActions button:first-child {
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
 }
 
 .modalActions button:first-child:hover {
-  background: #5568d3;
+  background: var(--color-primary-hover);
 }
 
 .modalActions button:last-child {

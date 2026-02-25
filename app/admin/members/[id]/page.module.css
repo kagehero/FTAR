@@ -78,12 +78,12 @@
 }
 
 .editButton {
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
 }
 
 .editButton:hover {
-  background: #5568d3;
+  background: var(--color-primary-hover);
 }
 
 .saveButton {

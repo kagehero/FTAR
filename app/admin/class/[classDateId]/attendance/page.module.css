@@ -41,8 +41,8 @@
 
 .printButton {
   padding: 8px 16px;
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
   border: none;
   border-radius: 6px;
   font-size: 14px;
@@ -52,7 +52,7 @@
 }
 
 .printButton:hover {
-  background: #5568d3;
+  background: var(--color-primary-hover);
 }
 
 .main {
