@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, logout } from '@/lib/auth-client'
 import LoadingScreen from '@/components/LoadingScreen'
+import MemberHeader from '@/components/MemberHeader'
 import styles from './page.module.css'
 
 interface TodayClass {
@@ -123,14 +124,7 @@ export default function MemberHomePage() {
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <h1 className={styles.logo}>FTAR</h1>
-          <button onClick={handleLogout} className={styles.logoutButton}>
-            ログアウト
-          </button>
-        </div>
-      </header>
+      <MemberHeader user={user} onLogout={handleLogout} />
 
       <main className={styles.main}>
         <div className={styles.welcomeBox}>

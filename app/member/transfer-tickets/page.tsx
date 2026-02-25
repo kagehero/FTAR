@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCurrentUser } from '@/lib/auth-client'
+import { getCurrentUser, logout } from '@/lib/auth-client'
 import LoadingScreen from '@/components/LoadingScreen'
+import MemberHeader from '@/components/MemberHeader'
 import styles from './page.module.css'
 
 interface TransferTicket {
@@ -56,6 +57,11 @@ export default function TransferTicketsPage() {
     fetchData()
   }, [router])
 
+  const handleLogout = async () => {
+    await logout()
+    router.push('/')
+  }
+
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'unused':
@@ -92,14 +98,7 @@ export default function TransferTicketsPage() {
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <button onClick={() => router.back()} className={styles.backButton}>
-            ← 戻る
-          </button>
-          <h1 className={styles.title}>振替チケット</h1>
-        </div>
-      </header>
+      <MemberHeader user={user} onLogout={handleLogout} />
 
       <main className={styles.main}>
         <div className={styles.summary}>

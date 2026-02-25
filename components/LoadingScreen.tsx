@@ -11,7 +11,10 @@ export default function LoadingScreen({ message = '読み込み中...' }: Loadin
   return (
     <div className={styles.container}>
       <LoadingBar />
-      <div className={styles.content}>{message}</div>
+      <div className={styles.center}>
+        <div className={styles.spinner} aria-hidden="true" />
+        <p className={styles.message}>{message}</p>
+      </div>
     </div>
   )
 }
