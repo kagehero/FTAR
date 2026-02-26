@@ -52,13 +52,29 @@ export default function ClassDatesPage() {
 
   const dayLabels = ['日', '月', '火', '水', '木', '金', '土']
   const activeClasses = classes.filter((cls) => cls.is_active !== false)
-  const uniqueClassNames = Array.from(new Set(activeClasses.map((c) => c.name))).sort()
 
-  const getClassesByName = (name: string) =>
-    activeClasses.filter((c) => c.name === name)
+  // 「クラス名 + 学年」の組み合わせごとにグループ化
+  const classGroupMap = new Map<string, any[]>()
+  activeClasses.forEach((cls) => {
+    const key = `${cls.name}__${cls.grade || ''}`
+    if (!classGroupMap.has(key)) {
+      classGroupMap.set(key, [])
+    }
+    classGroupMap.get(key)!.push(cls)
+  })
 
-  const resolveClassId = (name: string, day: number | '') => {
-    const candidates = getClassesByName(name)
+  const classNameOptions = Array.from(classGroupMap.entries())
+    .map(([key, group]) => {
+      const sample = group[0]
+      const label = sample.grade ? `${sample.name}（${sample.grade}）` : sample.name
+      return { key, label }
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, 'ja'))
+
+  const getClassesByName = (groupKey: string) => classGroupMap.get(groupKey) ?? []
+
+  const resolveClassId = (groupKey: string, day: number | '') => {
+    const candidates = getClassesByName(groupKey)
     if (candidates.length === 0) return ''
     if (candidates.length === 1) return candidates[0].id
     if (day === '') return ''
@@ -66,8 +82,8 @@ export default function ClassDatesPage() {
     return found ? found.id : ''
   }
 
-  const resolveClassIds = (name: string, days: number[]) => {
-    const candidates = getClassesByName(name)
+  const resolveClassIds = (groupKey: string, days: number[]) => {
+    const candidates = getClassesByName(groupKey)
     if (candidates.length === 0) return []
     if (candidates.length === 1) return [candidates[0].id]
     return days
@@ -405,39 +421,56 @@ export default function ClassDatesPage() {
                   >
                     <span className={styles.calendarDayNum}>{day.getDate()}</span>
                     <div className={styles.calendarDayEvents}>
-                      {datesOnDay.map((cd) => {
+                      {datesOnDay.map((cd, eventIndex) => {
                         const classInfo =
                           cd.class ??
                           classes.find((c) => c.id === cd.class_id) ??
                           null
                         const status =
                           cd.session_status || (cd.is_cancelled ? 'cancelled' : 'scheduled')
+
+                        const colorClass =
+                          styles[`calendarEventColor${eventIndex % 4}` as keyof typeof styles] ??
+                          ''
+
                         return (
-                          <div key={cd.id} className={styles.calendarEvent}>
-                            <span className={styles.calendarEventName}>
-                              {classInfo ? classInfo.name : '削除済み'}
-                            </span>
-                            <span
-                              className={
-                                status === 'cancelled'
-                                  ? styles.calendarEventCancelled
-                                  : status === 'completed'
-                                    ? styles.calendarEventCompleted
-                                    : status === 'holiday'
-                                      ? styles.calendarEventHoliday
-                                      : styles.calendarEventScheduled
-                              }
-                            >
-                              {SESSION_STATUS_LABELS[status] || status}
-                            </span>
-                            {classInfo && (
-                              <Link
-                                href={`/admin/class/${cd.id}/attendance`}
-                                className={styles.calendarEventLink}
+                          <div key={cd.id} className={`${styles.calendarEvent} ${colorClass}`}>
+                            <div className={styles.calendarEventHeader}>
+                              <span className={styles.calendarEventName}>
+                                {classInfo ? classInfo.name : '削除済み'}
+                              </span>
+                              {classInfo && classInfo.grade && (
+                                <span className={styles.calendarEventGrade}>{classInfo.grade}</span>
+                              )}
+                            </div>
+                            <div className={styles.calendarEventBadges}>
+                              {classInfo && (
+                                <span className={styles.calendarEventTimeBadge}>
+                                  {classInfo.start_time} - {classInfo.end_time}
+                                </span>
+                              )}
+                              <span
+                                className={
+                                  status === 'cancelled'
+                                    ? `${styles.calendarEventBadge} ${styles.calendarEventCancelled}`
+                                    : status === 'completed'
+                                      ? `${styles.calendarEventBadge} ${styles.calendarEventCompleted}`
+                                      : status === 'holiday'
+                                        ? `${styles.calendarEventBadge} ${styles.calendarEventHoliday}`
+                                        : `${styles.calendarEventBadge} ${styles.calendarEventScheduled}`
+                                }
                               >
-                                名簿
-                              </Link>
-                            )}
+                                {SESSION_STATUS_LABELS[status] || status}
+                              </span>
+                              {classInfo && (
+                                <Link
+                                  href={`/admin/class/${cd.id}/attendance`}
+                                  className={`${styles.calendarEventBadge} ${styles.calendarEventLinkBadge}`}
+                                >
+                                  名簿
+                                </Link>
+                              )}
+                            </div>
                           </div>
                         )
                       })}
@@ -454,7 +487,7 @@ export default function ClassDatesPage() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>クラス名</th>
+                <th>クラス名 / 学年</th>
                 <th>開催日</th>
                 <th>曜日</th>
                 <th>時間</th>
@@ -468,15 +501,18 @@ export default function ClassDatesPage() {
                   cd.class ??
                   classes.find((cls) => cls.id === cd.class_id) ??
                   null
+                const dateObj = new Date(cd.date)
                 return (
                   <tr key={cd.id}>
-                    <td>{classInfo ? classInfo.name : '削除済みクラス'}</td>
-                    <td>{new Date(cd.date).toLocaleDateString('ja-JP')}</td>
                     <td>
-                      {classInfo && typeof classInfo.day_of_week === 'number'
-                        ? getDayName(classInfo.day_of_week)
-                        : '-'}
+                      {classInfo
+                        ? classInfo.grade
+                          ? `${classInfo.name}（${classInfo.grade}）`
+                          : classInfo.name
+                        : '削除済みクラス'}
                     </td>
+                    <td>{dateObj.toLocaleDateString('ja-JP')}</td>
+                    <td>{getDayName(dateObj.getDay())}</td>
                     <td>
                       {classInfo
                         ? `${classInfo.start_time} - ${classInfo.end_time}`
@@ -564,9 +600,9 @@ export default function ClassDatesPage() {
                   }}
                 >
                   <option value="">選択してください</option>
-                  {uniqueClassNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
+                  {classNameOptions.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
@@ -709,9 +745,9 @@ export default function ClassDatesPage() {
                   }}
                 >
                   <option value="">選択してください</option>
-                  {uniqueClassNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
+                  {classNameOptions.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
