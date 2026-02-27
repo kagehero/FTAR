@@ -53,50 +53,40 @@ export default function ClassDatesPage() {
   const dayLabels = ['日', '月', '火', '水', '木', '金', '土']
   const activeClasses = classes.filter((cls) => cls.is_active !== false)
 
-  // 「クラス名 + 学年」の組み合わせごとにグループ化
-  const classGroupMap = new Map<string, any[]>()
-  activeClasses.forEach((cls) => {
-    const key = `${cls.name}__${cls.grade || ''}`
-    if (!classGroupMap.has(key)) {
-      classGroupMap.set(key, [])
-    }
-    classGroupMap.get(key)!.push(cls)
-  })
-
-  const classNameOptions = Array.from(classGroupMap.entries())
-    .map(([key, group]) => {
-      const sample = group[0]
-      const label = sample.grade ? `${sample.name}（${sample.grade}）` : sample.name
-      return { key, label }
+  // グループ化をやめ、クラス1件ごとに個別表示（クラス名 / 学年 / 曜日 / 時間）
+  const classNameOptions = activeClasses
+    .map((cls) => {
+      const dayLabel =
+        typeof cls.day_of_week === 'number' ? dayLabels[cls.day_of_week] ?? '' : ''
+      const timeLabel =
+        cls.start_time && cls.end_time ? `${cls.start_time} - ${cls.end_time}` : ''
+      const gradeLabel = cls.grade ? ` ${cls.grade}` : ''
+      const metaParts = [gradeLabel.trim(), dayLabel && `${dayLabel}曜`, timeLabel].filter(
+        Boolean
+      )
+      const meta = metaParts.length ? `（${metaParts.join(' / ')}）` : ''
+      return {
+        key: cls.id,
+        label: `${cls.name}${meta}`,
+      }
     })
     .sort((a, b) => a.label.localeCompare(b.label, 'ja'))
 
-  const getClassesByName = (groupKey: string) => classGroupMap.get(groupKey) ?? []
+  const getClassById = (id: string) => activeClasses.find((c) => c.id === id) ?? null
 
-  const resolveClassId = (groupKey: string, day: number | '') => {
-    const candidates = getClassesByName(groupKey)
-    if (candidates.length === 0) return ''
-    if (candidates.length === 1) return candidates[0].id
-    if (day === '') return ''
-    const found = candidates.find((c) => c.day_of_week === day)
-    return found ? found.id : ''
+  const resolveClassId = (classId: string, _day: number | '') => {
+    const target = getClassById(classId)
+    return target ? target.id : ''
   }
 
-  const resolveClassIds = (groupKey: string, days: number[]) => {
-    const candidates = getClassesByName(groupKey)
-    if (candidates.length === 0) return []
-    if (candidates.length === 1) return [candidates[0].id]
-    return days
-      .map((d) => candidates.find((c) => c.day_of_week === d)?.id)
-      .filter((id): id is string => !!id)
+  const resolveClassIds = (classId: string, _days: number[]) => {
+    const target = getClassById(classId)
+    return target ? [target.id] : []
   }
 
-  const toggleCreateDay = (day: number) => {
-    const candidates = getClassesByName(createClassName)
-    if (candidates.length <= 1) return
-    setCreateDayOfWeek((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => a - b)
-    )
+  const toggleCreateDay = (_day: number) => {
+    // 1クラスごとに個別生成する仕様のため、曜日ごとの複数選択は無効化
+    return
   }
   const [cancelModal, setCancelModal] = useState<{ id: string; isCancelled: boolean } | null>(null)
   const [cancelNote, setCancelNote] = useState('')
@@ -179,9 +169,7 @@ export default function ClassDatesPage() {
   }
 
   const handleCreate = async () => {
-    const candidates = getClassesByName(createClassName)
-    const classIds =
-      candidates.length === 1 ? [candidates[0].id] : resolveClassIds(createClassName, createDayOfWeek)
+    const classIds = createClassName ? resolveClassIds(createClassName, []) : []
 
     if (!createClassName || classIds.length === 0 || !createStartDate || !createEndDate) {
       toast.error('すべての項目を入力してください（曜日を1つ以上選択）')
@@ -585,7 +573,6 @@ export default function ClassDatesPage() {
             onClick={() => {
               setShowGenerateModal(false)
               setSelectedClassName('')
-              setSelectedDayOfWeek('')
             }}
           >
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -596,7 +583,6 @@ export default function ClassDatesPage() {
                   value={selectedClassName}
                   onChange={(e) => {
                     setSelectedClassName(e.target.value)
-                    setSelectedDayOfWeek('')
                   }}
                 >
                   <option value="">選択してください</option>
@@ -607,26 +593,7 @@ export default function ClassDatesPage() {
                   ))}
                 </select>
               </div>
-              {selectedClassName && getClassesByName(selectedClassName).length > 1 && (
-                <div className={styles.formGroup}>
-                  <label>曜日</label>
-                  <select
-                    value={selectedDayOfWeek}
-                    onChange={(e) =>
-                      setSelectedDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))
-                    }
-                  >
-                    <option value="">選択してください</option>
-                    {getClassesByName(selectedClassName)
-                      .sort((a, b) => a.day_of_week - b.day_of_week)
-                      .map((cls) => (
-                        <option key={cls.id} value={cls.day_of_week}>
-                          {dayLabels[cls.day_of_week]}曜日
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              )}
+              {/* 曜日選択はクラスごとに固有になったため不要 */}
               <div className={styles.formGroup}>
                 <label>開始日</label>
                 <input
@@ -649,7 +616,6 @@ export default function ClassDatesPage() {
                   onClick={() => {
                     setShowGenerateModal(false)
                     setSelectedClassName('')
-                    setSelectedDayOfWeek('')
                   }}
                 >
                   キャンセル
@@ -752,25 +718,7 @@ export default function ClassDatesPage() {
                   ))}
                 </select>
               </div>
-              {createClassName && getClassesByName(createClassName).length > 1 && (
-                <div className={styles.formGroup}>
-                  <label>曜日（複数選択可）</label>
-                  <div className={styles.dayCheckboxes}>
-                    {getClassesByName(createClassName)
-                      .sort((a, b) => a.day_of_week - b.day_of_week)
-                      .map((cls) => (
-                        <label key={cls.id} className={styles.dayCheckbox}>
-                          <input
-                            type="checkbox"
-                            checked={createDayOfWeek.includes(cls.day_of_week)}
-                            onChange={() => toggleCreateDay(cls.day_of_week)}
-                          />
-                          <span>{dayLabels[cls.day_of_week]}曜日</span>
-                        </label>
-                      ))}
-                  </div>
-                </div>
-              )}
+              {/* 複数曜日選択はクラスごとに固有になったため不要 */}
               <div className={styles.formGroup}>
                 <label>開始日</label>
                 <input
