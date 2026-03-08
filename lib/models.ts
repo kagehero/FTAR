@@ -24,6 +24,16 @@ export interface Member {
   updated_at: Date
 }
 
+// カテゴリ（クラス形態のマスタ）
+export interface Category {
+  _id?: string
+  id: string
+  name: string
+  sort_order?: number
+  created_at: Date
+  updated_at: Date
+}
+
 // クラス
 export interface Class {
   _id?: string

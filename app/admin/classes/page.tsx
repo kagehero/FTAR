@@ -24,16 +24,10 @@ interface ClassItem {
 
 const dayLabels = ['日', '月', '火', '水', '木', '金', '土']
 
-// カテゴリ（クラス形態）
-const CATEGORY_OPTIONS = ['キッズ', '通常', 'スーパー強化', '特化', '特待', 'その他'] as const
-
-const GRADE_BY_CATEGORY: Record<string, string[]> = {
-  キッズ: ['年少・年中・年長', '年少', '年中', '年長'],
-  通常: ['U8', 'U10', 'U12'],
-  スーパー強化: ['S', 'A'],
-  特化: ['基礎特化', 'DF特化', 'キック特化', 'ドリブル特化'],
-  特待: ['特待'],
-  その他: [],
+interface CategoryItem {
+  id: string
+  name: string
+  sort_order?: number
 }
 
 function parseGrades(gradeStr: string): string[] {
@@ -43,14 +37,6 @@ function parseGrades(gradeStr: string): string[] {
 
 function joinGrades(grades: string[]): string {
   return grades.filter(Boolean).join(',')
-}
-
-// grade から category を逆引き（編集時用）
-function getCategoryFromGrade(grade: string): string {
-  for (const [cat, grades] of Object.entries(GRADE_BY_CATEGORY)) {
-    if (grades.includes(grade)) return cat
-  }
-  return grade ? 'その他' : ''
 }
 
 export default function AdminClassesPage() {
@@ -73,6 +59,9 @@ export default function AdminClassesPage() {
   })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ClassItem | null>(null)
+  const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categorySaving, setCategorySaving] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -84,12 +73,19 @@ export default function AdminClassesPage() {
       }
       setUser(currentUser)
 
-      const res = await fetch('/api/admin/classes')
-      const data = await res.json()
-      if (data.success) {
-        setClasses(data.classes)
+      const [classesRes, categoriesRes] = await Promise.all([
+        fetch('/api/admin/classes'),
+        fetch('/api/admin/categories'),
+      ])
+      const classesData = await classesRes.json()
+      const categoriesData = await categoriesRes.json()
+      if (classesData.success) {
+        setClasses(classesData.classes)
       } else {
-        toast.error(data.error || 'クラス一覧の取得に失敗しました')
+        toast.error(classesData.error || 'クラス一覧の取得に失敗しました')
+      }
+      if (categoriesData.success) {
+        setCategories(categoriesData.categories)
       }
     } catch (e) {
       toast.error('予期しないエラーが発生しました')
@@ -126,11 +122,9 @@ export default function AdminClassesPage() {
     const parsedGrades = parseGrades(cls.grade || '').filter((g) =>
       GRADE_OPTIONS.includes(g as any)
     )
-    const category =
-      cls.category && cls.category in GRADE_BY_CATEGORY ? cls.category : ''
     setForm({
       ...cls,
-      category: category || '',
+      category: cls.category || '',
       grade: parsedGrades.length > 0 ? joinGrades(parsedGrades) : cls.grade || '',
       daysOfWeek: [cls.day_of_week],
     })
@@ -266,6 +260,52 @@ export default function AdminClassesPage() {
     }
   }
 
+  const handleAddCategory = async () => {
+    const name = newCategoryName.trim()
+    if (!name) {
+      toast.error('カテゴリ名を入力してください')
+      return
+    }
+    setCategorySaving(true)
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '追加に失敗しました')
+        return
+      }
+      toast.success('カテゴリを追加しました')
+      setNewCategoryName('')
+      const listRes = await fetch('/api/admin/categories')
+      const listData = await listRes.json()
+      if (listData.success) setCategories(listData.categories)
+    } catch (e) {
+      toast.error('予期しないエラーが発生しました')
+    } finally {
+      setCategorySaving(false)
+    }
+  }
+
+  const handleDeleteCategory = async (cat: CategoryItem) => {
+    if (!confirm(`カテゴリ「${cat.name}」を削除しますか？`)) return
+    try {
+      const res = await fetch(`/api/admin/categories/${cat.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '削除に失敗しました')
+        return
+      }
+      toast.success('カテゴリを削除しました')
+      setCategories((prev) => prev.filter((c) => c.id !== cat.id))
+    } catch (e) {
+      toast.error('予期しないエラーが発生しました')
+    }
+  }
+
   if (loading) {
     return <LoadingScreen />
   }
@@ -360,9 +400,9 @@ export default function AdminClassesPage() {
                 required
               >
                 <option value="">選択してください</option>
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
+                {categories.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -449,6 +489,46 @@ export default function AdminClassesPage() {
               )}
             </div>
           </form>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>カテゴリ管理</h2>
+          <p className={styles.sectionHint}>
+            クラスで使うカテゴリを追加できます。使用中のカテゴリは削除できません。
+          </p>
+          <div className={styles.categoryAdd}>
+            <input
+              type="text"
+              className={styles.input}
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="新しいカテゴリ名"
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
+            />
+            <button
+              type="button"
+              className={styles.submitButton}
+              onClick={handleAddCategory}
+              disabled={categorySaving || !newCategoryName.trim()}
+            >
+              {categorySaving ? '追加中...' : '追加'}
+            </button>
+          </div>
+          <ul className={styles.categoryList}>
+            {categories.map((c) => (
+              <li key={c.id} className={styles.categoryItem}>
+                <span>{c.name}</span>
+                <button
+                  type="button"
+                  className={styles.deleteButton}
+                  onClick={() => handleDeleteCategory(c)}
+                  title="カテゴリを削除"
+                >
+                  削除
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className={styles.section}>

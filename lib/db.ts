@@ -2,6 +2,7 @@ import { MongoClient, Db, Collection } from 'mongodb'
 import type {
   Member,
   Class,
+  Category,
   ClassDate,
   Attendance,
   TransferTicket,
@@ -50,6 +51,11 @@ export async function getMembersCollection(): Promise<Collection<Member>> {
 export async function getClassesCollection(): Promise<Collection<Class>> {
   const database = await connectToDatabase()
   return database.collection<Class>('classes')
+}
+
+export async function getCategoriesCollection(): Promise<Collection<Category>> {
+  const database = await connectToDatabase()
+  return database.collection<Category>('categories')
 }
 
 export async function getClassDatesCollection(): Promise<Collection<ClassDate>> {
