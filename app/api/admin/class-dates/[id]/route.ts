@@ -50,7 +50,7 @@ export async function PUT(
     const nowCancelled =
       sessionStatus === 'cancelled' ||
       sessionStatus === 'holiday' ||
-      (isCancelled ?? sessionStatus === 'cancelled' || sessionStatus === 'holiday')
+      (isCancelled ?? (sessionStatus === 'cancelled' || sessionStatus === 'holiday'))
 
     // 中止処理
     if (!wasCancelled && nowCancelled) {
