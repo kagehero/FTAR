@@ -5,6 +5,17 @@ import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 
+// 会員用パスワードを自動生成
+export function generateRandomPassword(length: number = 10): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    const idx = Math.floor(Math.random() * chars.length)
+    result += chars[idx]
+  }
+  return result
+}
+
 export interface LoginResult {
   success: boolean
   user?: Omit<Member, 'password'>
@@ -147,6 +158,7 @@ export async function registerWithEmail(
       status: 'active',
       is_active: true,
       is_deleted: false,
+      enrolled_class_ids: [],
       created_at: new Date(),
       updated_at: new Date(),
     }

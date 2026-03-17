@@ -52,7 +52,13 @@ export async function GET(request: NextRequest) {
 
     const result = await Promise.all(
       tickets.map(async (ticket) => {
-        const member = await membersCollection.findOne({ id: ticket.member_id })
+        const memberDoc = await membersCollection.findOne({ id: ticket.member_id })
+        const member = memberDoc
+          ? (() => {
+              const { password, ...rest } = memberDoc as any
+              return rest
+            })()
+          : null
         const originalClassDate = await classDatesCollection.findOne({
           id: ticket.class_date_id,
         })

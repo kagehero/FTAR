@@ -16,6 +16,9 @@ export interface Member {
   name: string
   grade: string // 学年
   phone?: string
+  // 参加クラス（クラスIDの配列）
+  // これが設定されている場合、出欠名簿は基本的にこの参加クラスを基準に表示する
+  enrolled_class_ids?: string[]
   role: UserRole
   status: MemberStatus
   is_active: boolean

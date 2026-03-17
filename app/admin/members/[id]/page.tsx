@@ -16,6 +16,7 @@ interface Member {
   status: string
   is_active: boolean
   created_at: string
+  enrolled_class_ids?: string[]
 }
 
 interface Attendance {
@@ -51,6 +52,9 @@ export default function MemberDetailPage() {
 
   const [user, setUser] = useState<any>(null)
   const [member, setMember] = useState<Member | null>(null)
+  const [classes, setClasses] = useState<{ id: string; name: string; day_of_week: number; start_time: string; grade: string }[]>([])
+  const [enrolledClassIds, setEnrolledClassIds] = useState<string[]>([])
+  const [classSaving, setClassSaving] = useState(false)
   const [attendances, setAttendances] = useState<Attendance[]>([])
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
@@ -65,14 +69,26 @@ export default function MemberDetailPage() {
     setUser(currentUser)
 
     try {
-      const res = await fetch(`/api/admin/members/${memberId}`)
+      const [res, classesRes] = await Promise.all([
+        fetch(`/api/admin/members/${memberId}`),
+        fetch('/api/admin/classes'),
+      ])
+
       if (res.ok) {
         const data = await res.json()
         if (data.success) {
           setMember(data.member)
+          setEnrolledClassIds(Array.isArray(data.member?.enrolled_class_ids) ? data.member.enrolled_class_ids : [])
           setAttendances(data.attendances)
           setTransfers(data.transfers)
           setNotifications(data.notifications)
+        }
+      }
+
+      if (classesRes.ok) {
+        const classesData = await classesRes.json()
+        if (classesData.success) {
+          setClasses(classesData.classes || [])
         }
       }
     } catch (error) {
@@ -110,6 +126,33 @@ export default function MemberDetailPage() {
         <div className={styles.error}>会員が見つかりません</div>
       </div>
     )
+  }
+
+  const dayLabels = ['日', '月', '火', '水', '木', '金', '土']
+  const toggleEnrollClass = (classId: string) => {
+    setEnrolledClassIds((prev) => (prev.includes(classId) ? prev.filter((x) => x !== classId) : [...prev, classId]))
+  }
+
+  const saveEnrolledClasses = async () => {
+    setClassSaving(true)
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrolled_class_ids: enrolledClassIds }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '保存に失敗しました')
+        return
+      }
+      toast.success('参加クラスを保存しました')
+      setMember((prev) => (prev ? { ...prev, enrolled_class_ids: enrolledClassIds } : prev))
+    } catch (e) {
+      toast.error('エラーが発生しました')
+    } finally {
+      setClassSaving(false)
+    }
   }
 
   return (
@@ -156,6 +199,41 @@ export default function MemberDetailPage() {
                 {new Date(member.created_at).toLocaleDateString('ja-JP')}
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* 参加クラス */}
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>参加クラス</h2>
+          <p className={styles.sectionHint}>
+            ここで設定したクラスが、管理側の「出欠名簿（未登録）」に表示される対象になります。
+            出欠は自動で「出席」にはならず、当日チェックして記録します。
+          </p>
+          {classes.length === 0 ? (
+            <div className={styles.emptyMessage}>クラスが登録されていません</div>
+          ) : (
+            <div className={styles.historyList}>
+              {classes.map((cls) => (
+                <label key={cls.id} className={styles.historyItem} style={{ cursor: 'pointer' }}>
+                  <div className={styles.historyInfo}>
+                    <span className={styles.historyDate}>
+                      {dayLabels[cls.day_of_week] ?? '-'} {cls.start_time}
+                    </span>
+                    <span className={styles.historyClass}>{cls.name}</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={enrolledClassIds.includes(cls.id)}
+                    onChange={() => toggleEnrollClass(cls.id)}
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <button className={styles.backButton} onClick={saveEnrolledClasses} disabled={classSaving}>
+              {classSaving ? '保存中...' : '参加クラスを保存'}
+            </button>
           </div>
         </div>
 

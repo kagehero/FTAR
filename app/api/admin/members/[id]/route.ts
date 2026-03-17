@@ -156,7 +156,7 @@ export async function PUT(
 
     const { id: memberId } = await context.params
     const body = await request.json()
-    const { name, grade, phone, status, is_active } = body
+    const { name, grade, phone, status, is_active, enrolled_class_ids } = body
 
     const membersCollection = await getMembersCollection()
     const member = await membersCollection.findOne({ id: memberId })
@@ -177,6 +177,16 @@ export async function PUT(
     if (phone !== undefined) updateData.phone = phone
     if (status !== undefined) updateData.status = status
     if (is_active !== undefined) updateData.is_active = is_active
+    if (enrolled_class_ids !== undefined) {
+      if (Array.isArray(enrolled_class_ids) && enrolled_class_ids.every((x) => typeof x === 'string')) {
+        updateData.enrolled_class_ids = Array.from(new Set(enrolled_class_ids.map((s) => s.trim()).filter(Boolean)))
+      } else {
+        return NextResponse.json(
+          { success: false, error: '参加クラスの形式が正しくありません' },
+          { status: 400 }
+        )
+      }
+    }
 
     await membersCollection.updateOne({ id: memberId }, { $set: updateData })
 

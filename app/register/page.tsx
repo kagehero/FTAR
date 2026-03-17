@@ -20,16 +20,17 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // パスワード確認
-    if (password !== confirmPassword) {
-      toast.error('パスワードが一致しません')
-      return
-    }
+    // パスワードを入力した場合のみバリデーション
+    if (password || confirmPassword) {
+      if (password !== confirmPassword) {
+        toast.error('パスワードが一致しません')
+        return
+      }
 
-    // パスワードの長さチェック
-    if (password.length < 6) {
-      toast.error('パスワードは6文字以上で入力してください')
-      return
+      if (password.length < 6) {
+        toast.error('パスワードは6文字以上で入力してください')
+        return
+      }
     }
 
     setLoading(true)
@@ -117,7 +118,7 @@ export default function RegisterPage() {
 
           <div className={styles.formGroup}>
             <label htmlFor="password" className={styles.label}>
-              パスワード
+              パスワード（任意）
             </label>
             <input
               id="password"
@@ -125,17 +126,18 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={styles.input}
-              placeholder="6文字以上"
-              required
+              placeholder="未入力の場合は自動生成されます（6文字以上推奨）"
               disabled={loading}
               minLength={6}
             />
-            <p className={styles.hint}>6文字以上で入力してください</p>
+            <p className={styles.hint}>
+              入力しない場合はシステムが安全なパスワードを自動で発行します。
+            </p>
           </div>
 
           <div className={styles.formGroup}>
             <label htmlFor="confirmPassword" className={styles.label}>
-              パスワード（確認）
+              パスワード（確認・任意）
             </label>
             <input
               id="confirmPassword"
@@ -143,8 +145,7 @@ export default function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={styles.input}
-              placeholder="パスワードを再入力"
-              required
+              placeholder="入力した場合のみ確認が必要です"
               disabled={loading}
               minLength={6}
             />

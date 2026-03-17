@@ -12,15 +12,15 @@ interface Transfer {
   issued_at: string
   expires_at: string
   used_at?: string
-  member: {
+  member?: {
     id: string
     name: string
     grade: string
   }
-  originalClass: {
+  originalClass?: {
     name: string
   }
-  originalClassDate: {
+  originalClassDate?: {
     date: string
   }
   usedClass?: {
@@ -153,13 +153,21 @@ export default function TransfersPage() {
                 <tr key={transfer.id}>
                   <td>{new Date(transfer.issued_at).toLocaleDateString('ja-JP')}</td>
                   <td>
-                    {transfer.member.name} ({transfer.member.grade})
+                    {transfer.member ? (
+                      <>
+                        {transfer.member.name} ({transfer.member.grade})
+                      </>
+                    ) : (
+                      <span className={styles.notUsed}>（退会/削除済み）</span>
+                    )}
                   </td>
                   <td>
-                    {transfer.originalClass.name}
+                    {transfer.originalClass?.name || '（クラス不明）'}
                     <br />
                     <span className={styles.dateText}>
-                      {new Date(transfer.originalClassDate.date).toLocaleDateString('ja-JP')}
+                      {transfer.originalClassDate?.date
+                        ? new Date(transfer.originalClassDate.date).toLocaleDateString('ja-JP')
+                        : '（日付不明）'}
                     </span>
                   </td>
                   <td>

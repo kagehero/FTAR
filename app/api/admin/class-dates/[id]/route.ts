@@ -46,8 +46,11 @@ export async function PUT(
     }
 
     const wasCancelled = classDate.is_cancelled
+    const isHoliday = sessionStatus === 'holiday' || classDate.session_status === 'holiday'
     const nowCancelled =
-      sessionStatus === 'cancelled' || (isCancelled ?? sessionStatus === 'cancelled')
+      sessionStatus === 'cancelled' ||
+      sessionStatus === 'holiday' ||
+      (isCancelled ?? sessionStatus === 'cancelled' || sessionStatus === 'holiday')
 
     // 中止処理
     if (!wasCancelled && nowCancelled) {
@@ -91,7 +94,8 @@ export async function PUT(
     }
 
     const sessionStatusVal =
-      sessionStatus ?? (nowCancelled ? 'cancelled' : classDate.session_status ?? 'scheduled')
+      sessionStatus ??
+      (isHoliday ? 'holiday' : nowCancelled ? 'cancelled' : classDate.session_status ?? 'scheduled')
     const noteVal = note ?? cancelledReason
 
     await classDatesCollection.updateOne(

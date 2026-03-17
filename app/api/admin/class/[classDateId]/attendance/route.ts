@@ -7,7 +7,6 @@ import {
   getMembersCollection,
   getWaitlistsCollection,
 } from '@/lib/db'
-import { GRADE_BY_CATEGORY, TARGET_GRADE_TO_MEMBER_GRADES } from '@/lib/constants'
 import type { Attendance } from '@/lib/models'
 
 // 出欠名簿取得
@@ -74,34 +73,13 @@ export async function GET(
       .find({ class_date_id: classDateId, status: 'waiting' })
       .toArray()
 
-    // 未登録者（対象学年に該当する会員で出欠未登録）
-    let gradesToMatch: string[] = []
-    const gradeStr = classInfo.grade || ''
-    if (gradeStr.includes(',')) {
-      const targets = gradeStr.split(',').map((s) => s.trim()).filter(Boolean)
-      for (const t of targets) {
-        const expanded = TARGET_GRADE_TO_MEMBER_GRADES[t]
-        if (expanded) gradesToMatch.push(...expanded)
-        else gradesToMatch.push(t)
-      }
-    } else if (gradeStr) {
-      const expanded = TARGET_GRADE_TO_MEMBER_GRADES[gradeStr]
-      gradesToMatch = expanded || [gradeStr]
-    }
-    if (gradesToMatch.length === 0) {
-      gradesToMatch = GRADE_BY_CATEGORY[classInfo.category] ?? [classInfo.grade].filter(Boolean)
-    }
-    const gradesToMatchUnique = Array.from(new Set(gradesToMatch))
-    const memberGrades =
-      gradesToMatchUnique.length > 0
-        ? gradesToMatchUnique
-        : GRADE_BY_CATEGORY[classInfo.category] ?? (classInfo.grade ? [classInfo.grade] : [])
-    const allMembers = await membersCollection
+    // 未登録者（参加クラスに含まれる会員で出欠未登録）
+    const enrolledMembers = await membersCollection
       .find({
         role: 'member',
         is_active: true,
         is_deleted: false,
-        grade: { $in: memberGrades },
+        enrolled_class_ids: classInfo.id,
       })
       .toArray()
 
@@ -115,7 +93,7 @@ export async function GET(
       ...waitlistsData.map((w) => w.member_id),
     ])
 
-    const unregistered = allMembers.filter((m) => !registeredMemberIds.has(m.id))
+    const unregistered = enrolledMembers.filter((m) => !registeredMemberIds.has(m.id))
 
     // キャンセル待ち
     const waitlists = await waitlistsCollection
