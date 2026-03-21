@@ -4,8 +4,10 @@ import {
   getClassesCollection,
   getClassDatesCollection,
   getTransferTicketsCollection,
+  getMembersCollection,
 } from '../db'
 import type { Waitlist, Attendance, TransferTicket } from '../models'
+import { sendTransferPromotionEmail } from '../email'
 
 // 指定した開催日のキャンセル待ちを、空き枠がある範囲で繰り上げ
 export async function promoteWaitlistForClassDate(classDateId: string): Promise<void> {
@@ -97,6 +99,27 @@ export async function promoteWaitlistForClassDate(classDateId: string): Promise<
         },
       }
     )
+
+    // 繰り上げ時メール通知
+    const membersCollection = await getMembersCollection()
+    const member = await membersCollection.findOne({ id: entry.member_id })
+    if (member?.email) {
+      const dateStr = classDate.date
+        ? new Date(classDate.date).toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'short',
+          })
+        : ''
+      await sendTransferPromotionEmail(
+        member.email,
+        member.name,
+        classInfo.name,
+        dateStr,
+        classInfo.start_time || ''
+      )
+    }
 
     remainingCapacity -= 1
   }

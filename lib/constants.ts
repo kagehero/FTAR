@@ -11,6 +11,22 @@ export const GRADE_BY_CATEGORY: Record<string, string[]> = {
   その他: [],
 }
 
+// 振替可否ルール（MVP: シンプルルールベース）
+// 特待→全クラスOK、特化→強化NG、同一カテゴリ内→OK
+export const TRANSFER_CATEGORY_RULES: Record<string, string[]> = {
+  特待: ['キッズ', '通常', 'スーパー強化', '特化', '特待', 'その他'], // 全OK
+  特化: ['キッズ', '通常', '特化', 'その他'], // 強化NG
+  スーパー強化: ['キッズ', '通常', 'スーパー強化', '特待', 'その他'],
+  通常: ['キッズ', '通常', 'スーパー強化', '特待', 'その他'],
+  キッズ: ['キッズ', '通常', '特待', 'その他'],
+  その他: ['キッズ', '通常', 'スーパー強化', '特化', '特待', 'その他'],
+}
+
+export const TRANSFER_LIMIT_PER_MONTH = 1
+export const TRANSFER_DEADLINE_MONTHS = 2
+export const ABSENCE_DEADLINE_HOURS = 1
+export const TRANSFER_DEADLINE_HOURS = 1
+
 // 対象学年（キッズ〜6年）→ 会員のgradeにマッチする値
 export const TARGET_GRADE_TO_MEMBER_GRADES: Record<string, string[]> = {
   キッズ: ['年少・年中・年長', '年少', '年中', '年長', 'キッズ'],

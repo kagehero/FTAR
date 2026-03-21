@@ -8,6 +8,7 @@ import {
   getClassesCollection,
   getNotificationLogsCollection,
 } from '@/lib/db'
+import { syncAttendancesForEnrolledClasses } from '@/lib/services/enrollment-service'
 
 // 会員詳細取得
 export async function GET(
@@ -189,6 +190,14 @@ export async function PUT(
     }
 
     await membersCollection.updateOne({ id: memberId }, { $set: updateData })
+
+    if (enrolled_class_ids !== undefined && updateData.enrolled_class_ids) {
+      try {
+        await syncAttendancesForEnrolledClasses(memberId, updateData.enrolled_class_ids)
+      } catch (e) {
+        console.error('Sync attendances for enrolled classes error:', e)
+      }
+    }
 
     return NextResponse.json({
       success: true,

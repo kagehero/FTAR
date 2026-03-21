@@ -8,6 +8,10 @@ import {
 } from '@/lib/db'
 import type { Attendance, TransferTicket } from '@/lib/models'
 import { promoteWaitlistForClassDate } from '@/lib/services/waitlist-service'
+import {
+  TRANSFER_DEADLINE_MONTHS,
+  TRANSFER_LIMIT_PER_MONTH,
+} from '@/lib/constants'
 
 // 出欠登録
 export async function POST(
@@ -117,11 +121,10 @@ export async function POST(
       await attendancesCollection.insertOne(attendanceData)
     }
 
-    // 欠席の場合、振替チケットを発行
+    // 欠席の場合、振替チケットを発行（月1回まで・自己都合のみ）
     if (status === 'absent' && classInfo.allow_transfer) {
       const ticketsCollection = await getTransferTicketsCollection()
 
-      // 既存のチケットをチェック
       const existingTicket = await ticketsCollection.findOne({
         member_id: user.id,
         class_date_id: classDateId,
@@ -129,24 +132,35 @@ export async function POST(
       })
 
       if (!existingTicket) {
-        // 有効期限を設定（月末または30日後）
-        const expiresAt = new Date()
-        expiresAt.setMonth(expiresAt.getMonth() + 1)
-        expiresAt.setDate(0) // 月末
-        expiresAt.setHours(23, 59, 59, 999)
-
-        const ticket: TransferTicket = {
-          id: `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        // 月1回まで（自己都合）。今月の使用済み振替回数をチェック
+        const monthStart = new Date()
+        monthStart.setDate(1)
+        monthStart.setHours(0, 0, 0, 0)
+        const usedThisMonth = await ticketsCollection.countDocuments({
           member_id: user.id,
-          class_date_id: classDateId,
-          issued_at: new Date(),
-          expires_at: expiresAt,
-          status: 'unused',
-          created_at: new Date(),
-          updated_at: new Date(),
-        }
+          status: 'used',
+          used_at: { $gte: monthStart },
+        })
+        if (usedThisMonth >= TRANSFER_LIMIT_PER_MONTH) {
+          // 月制限超過のため振替チケットは発行しない（欠席登録自体は成功）
+        } else {
+          const expiresAt = new Date()
+          expiresAt.setMonth(expiresAt.getMonth() + TRANSFER_DEADLINE_MONTHS + 1)
+          expiresAt.setDate(0)
+          expiresAt.setHours(23, 59, 59, 999)
 
-        await ticketsCollection.insertOne(ticket)
+          const ticket: TransferTicket = {
+            id: `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            member_id: user.id,
+            class_date_id: classDateId,
+            issued_at: new Date(),
+            expires_at: expiresAt,
+            status: 'unused',
+            created_at: new Date(),
+            updated_at: new Date(),
+          }
+          await ticketsCollection.insertOne(ticket)
+        }
       }
     }
 

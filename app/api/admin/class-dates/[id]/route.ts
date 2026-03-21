@@ -7,6 +7,7 @@ import {
   getMembersCollection,
 } from '@/lib/db'
 import type { Attendance, TransferTicket } from '@/lib/models'
+import { TRANSFER_DEADLINE_MONTHS } from '@/lib/constants'
 
 // 開催日更新
 export async function PUT(
@@ -47,12 +48,10 @@ export async function PUT(
 
     const wasCancelled = classDate.is_cancelled
     const isHoliday = sessionStatus === 'holiday' || classDate.session_status === 'holiday'
-    const nowCancelled =
-      sessionStatus === 'cancelled' ||
-      sessionStatus === 'holiday' ||
-      (isCancelled ?? (sessionStatus === 'cancelled' || sessionStatus === 'holiday'))
+    // 雨天中止のみ振替対象。休講日(holiday)は表示のみ・振替対象外
+    const nowCancelled = sessionStatus === 'cancelled' || (isCancelled ?? sessionStatus === 'cancelled')
 
-    // 中止処理
+    // 中止処理（雨天中止のみ。休講日は出席・チケット変更なし）
     if (!wasCancelled && nowCancelled) {
       const attendancesCollection = await getAttendancesCollection()
       const ticketsCollection = await getTransferTicketsCollection()
@@ -72,7 +71,7 @@ export async function PUT(
 
         const now = new Date()
         const expiresAt = new Date()
-        expiresAt.setMonth(expiresAt.getMonth() + 1)
+        expiresAt.setMonth(expiresAt.getMonth() + TRANSFER_DEADLINE_MONTHS + 1)
         expiresAt.setDate(0)
         expiresAt.setHours(23, 59, 59, 999)
 
@@ -96,13 +95,15 @@ export async function PUT(
     const sessionStatusVal =
       sessionStatus ??
       (isHoliday ? 'holiday' : nowCancelled ? 'cancelled' : classDate.session_status ?? 'scheduled')
+    // 休講日(holiday)の場合はis_cancelled=falseのまま（表示のみ扱い）
+    const finalIsCancelled = isHoliday ? false : nowCancelled
     const noteVal = note ?? cancelledReason
 
     await classDatesCollection.updateOne(
       { id: classDateId },
       {
         $set: {
-          is_cancelled: nowCancelled,
+          is_cancelled: finalIsCancelled,
           cancelled_reason: noteVal || cancelledReason || undefined,
           auto_transfer_ticket: autoTransferTicket ?? classDate.auto_transfer_ticket,
           session_status: sessionStatusVal,

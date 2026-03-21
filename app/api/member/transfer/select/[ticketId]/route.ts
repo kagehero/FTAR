@@ -9,6 +9,7 @@ import {
 } from '@/lib/db'
 import type { Attendance, Waitlist } from '@/lib/models'
 import { promoteWaitlistForClassDate } from '@/lib/services/waitlist-service'
+import { TRANSFER_CATEGORY_RULES, TRANSFER_DEADLINE_HOURS } from '@/lib/constants'
 
 // 候補開催日の取得
 export async function GET(
@@ -69,26 +70,38 @@ export async function GET(
       ? await classesCollection.findOne({ id: originalClassDate.class_id })
       : null
 
-    // 今後の開催日から候補を取得
-    const today = new Date()
+    // 今後の開催日から候補を取得（休講日は除外）
+    const today = new Date(now)
     today.setHours(0, 0, 0, 0)
 
     const futureClassDates = await classDatesCollection
       .find({
         date: { $gte: today },
         is_cancelled: false,
+        $or: [
+          { session_status: { $exists: false } },
+          { session_status: 'scheduled' },
+        ],
       })
       .toArray()
+
+    const sourceCategory = originalClass?.category || 'その他'
+    const allowedTargetCategories = TRANSFER_CATEGORY_RULES[sourceCategory] ?? [sourceCategory]
 
     const options = await Promise.all(
       futureClassDates.map(async (cd) => {
         const cls = await classesCollection.findOne({ id: cd.class_id })
         if (!cls || !cls.allow_transfer || !cls.is_active) return null
 
-        // 学年・カテゴリで制御（シンプルに同じカテゴリ、または同じ学年のみ許可）
-        if (originalClass) {
-          if (cls.category !== originalClass.category) return null
-        }
+        // 振替可否（特待→全OK、特化→強化NG、同一カテゴリ→OK）
+        if (!allowedTargetCategories.includes(cls.category)) return null
+
+        // 締切：開始1時間前
+        const classDateTime = new Date(cd.date)
+        const [h, m] = cls.start_time.split(':').map(Number)
+        classDateTime.setHours(h, m, 0, 0)
+        const deadline = new Date(classDateTime.getTime() - TRANSFER_DEADLINE_HOURS * 60 * 60 * 1000)
+        if (now > deadline) return null
 
         // 出席者数と待機人数を計算
         const attendingCount = await attendancesCollection.countDocuments({
@@ -193,7 +206,7 @@ export async function POST(
     }
 
     const classDate = await classDatesCollection.findOne({ id: classDateId })
-    if (!classDate || classDate.is_cancelled) {
+    if (!classDate || classDate.is_cancelled || classDate.session_status === 'holiday') {
       return NextResponse.json(
         { success: false, error: '選択された開催日は利用できません' },
         { status: 400 }
@@ -211,6 +224,32 @@ export async function POST(
     if (!classInfo.allow_transfer) {
       return NextResponse.json(
         { success: false, error: 'このクラスは振替対象外です' },
+        { status: 400 }
+      )
+    }
+
+    // 締切：開始1時間前
+    const classDateTime = new Date(classDate.date)
+    const [h, m] = classInfo.start_time.split(':').map(Number)
+    classDateTime.setHours(h, m, 0, 0)
+    const deadline = new Date(classDateTime.getTime() - TRANSFER_DEADLINE_HOURS * 60 * 60 * 1000)
+    if (now > deadline) {
+      return NextResponse.json(
+        { success: false, error: '振替の締切（開始1時間前）を過ぎています' },
+        { status: 400 }
+      )
+    }
+
+    // 振替可否（カテゴリルール）
+    const originalClassDate = await classDatesCollection.findOne({ id: ticket.class_date_id })
+    const originalClass = originalClassDate
+      ? await classesCollection.findOne({ id: originalClassDate.class_id })
+      : null
+    const sourceCategory = originalClass?.category || 'その他'
+    const allowedTargetCategories = TRANSFER_CATEGORY_RULES[sourceCategory] ?? [sourceCategory]
+    if (!allowedTargetCategories.includes(classInfo.category)) {
+      return NextResponse.json(
+        { success: false, error: 'このクラスへの振替はできません（カテゴリ制限）' },
         { status: 400 }
       )
     }
