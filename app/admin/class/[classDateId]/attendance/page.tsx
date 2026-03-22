@@ -163,7 +163,7 @@ export default function AttendanceListPage() {
             {classInfo?.start_time} - {classInfo?.end_time} @ {classInfo?.venue}
           </p>
           {isCancelled && (
-            <div className={styles.cancelledNotice}>雨天中止のため出欠操作はできません</div>
+            <div className={styles.cancelledNotice}>中止のため出欠操作はできません</div>
           )}
         </div>
 

@@ -11,7 +11,7 @@ import styles from './page.module.css'
 const SESSION_STATUS_LABELS: Record<string, string> = {
   scheduled: '予定',
   completed: '開催済',
-  cancelled: '雨天中止',
+  cancelled: '中止',
   holiday: '休み',
 }
 
@@ -558,10 +558,10 @@ export default function ClassDatesPage() {
                             className={styles.cancelButton}
                             onClick={() => {
                               setCancelModal({ id: cd.id, isCancelled: false })
-                              setCancelNote('雨天')
+                              setCancelNote('')
                             }}
                           >
-                            雨天中止
+                            中止
                           </button>
                           <button
                             className={styles.cancelButton}
@@ -690,16 +690,16 @@ export default function ClassDatesPage() {
           </div>
         )}
 
-        {/* 雨天中止モーダル */}
+        {/* 中止モーダル */}
         {cancelModal && (
           <div
             className={styles.modalOverlay}
             onClick={() => setCancelModal(null)}
           >
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <h2>雨天中止</h2>
+              <h2>中止</h2>
               <p className={styles.modalHint}>
-                備考を入力してください（例: 雨天、台風のため）
+                備考を入力してください（例: 雨天、台風、祝日など）
               </p>
               <div className={styles.formGroup}>
                 <label>備考</label>
@@ -707,13 +707,13 @@ export default function ClassDatesPage() {
                   type="text"
                   value={cancelNote}
                   onChange={(e) => setCancelNote(e.target.value)}
-                  placeholder="雨天"
+                  placeholder="雨天、台風、祝日など"
                 />
               </div>
               <div className={styles.modalActions}>
                 <button
                   onClick={() =>
-                    doCancel(cancelModal.id, true, cancelNote || '雨天')
+                    doCancel(cancelModal.id, true, cancelNote || '中止')
                   }
                 >
                   中止にする
