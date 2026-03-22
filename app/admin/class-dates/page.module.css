@@ -370,6 +370,16 @@
   font-weight: 500;
 }
 
+.holidayBadge {
+  background: #f5f5f5;
+  color: #616161;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #e0e0e0;
+}
+
 .cancelButton,
 .attendanceButton {
   padding: 6px 12px;

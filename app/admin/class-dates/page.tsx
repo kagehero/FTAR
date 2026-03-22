@@ -215,28 +215,41 @@ export default function ClassDatesPage() {
 
   const handleCancel = async (classDateId: string, isCancelled: boolean) => {
     if (isCancelled) {
-      doCancel(classDateId, false, '')
+      doCancel(classDateId, false, '', 'scheduled')
       return
     }
     setCancelModal({ id: classDateId, isCancelled: false })
     setCancelNote('雨天')
   }
 
+  const handleSetHoliday = async (classDateId: string) => {
+    await doCancel(classDateId, false, '', 'holiday')
+  }
+
+  const handleRevertHoliday = async (classDateId: string) => {
+    await doCancel(classDateId, false, '', 'scheduled')
+  }
+
   const doCancel = async (
     classDateId: string,
     isCancelled: boolean,
-    note: string
+    note: string,
+    sessionStatusOverride?: 'scheduled' | 'cancelled' | 'holiday'
   ) => {
     try {
+      const sessionStatus =
+        sessionStatusOverride ??
+        (isCancelled ? 'cancelled' : 'scheduled')
+
       const res = await fetch(`/api/admin/class-dates/${classDateId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          isCancelled,
-          sessionStatus: isCancelled ? 'cancelled' : 'scheduled',
+          isCancelled: sessionStatus === 'cancelled',
+          sessionStatus,
           cancelledReason: note || undefined,
           note: note || undefined,
-          autoTransferTicket: true,
+          autoTransferTicket: sessionStatus === 'cancelled',
         }),
       })
       const data = await res.json()
@@ -512,7 +525,9 @@ export default function ClassDatesPage() {
                           (cd.session_status || (cd.is_cancelled ? 'cancelled' : 'scheduled')) ===
                           'cancelled'
                             ? styles.cancelledBadge
-                            : styles.activeBadge
+                            : (cd.session_status || 'scheduled') === 'holiday'
+                              ? styles.holidayBadge
+                              : styles.activeBadge
                         }
                       >
                         {SESSION_STATUS_LABELS[
@@ -522,19 +537,41 @@ export default function ClassDatesPage() {
                       </span>
                     </td>
                     <td>
-                      <button
-                        className={styles.cancelButton}
-                        onClick={() => {
-                          if (cd.is_cancelled) {
-                            doCancel(cd.id, false, '')
-                          } else {
-                            setCancelModal({ id: cd.id, isCancelled: false })
-                            setCancelNote('雨天')
-                          }
-                        }}
-                      >
-                        {cd.is_cancelled ? '再開' : '雨天中止'}
-                      </button>
+                      {cd.session_status === 'holiday' ? (
+                        <button
+                          className={styles.cancelButton}
+                          onClick={() => handleRevertHoliday(cd.id)}
+                          title="予定に戻す"
+                        >
+                          予定に戻す
+                        </button>
+                      ) : cd.session_status === 'cancelled' ? (
+                        <button
+                          className={styles.cancelButton}
+                          onClick={() => doCancel(cd.id, false, '', 'scheduled')}
+                        >
+                          再開
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            className={styles.cancelButton}
+                            onClick={() => {
+                              setCancelModal({ id: cd.id, isCancelled: false })
+                              setCancelNote('雨天')
+                            }}
+                          >
+                            雨天中止
+                          </button>
+                          <button
+                            className={styles.cancelButton}
+                            onClick={() => handleSetHoliday(cd.id)}
+                            title="休講日（春休み・祝日・第5週など）"
+                          >
+                            休み
+                          </button>
+                        </>
+                      )}
                       {classInfo ? (
                         <Link
                           href={`/admin/class/${cd.id}/attendance`}
