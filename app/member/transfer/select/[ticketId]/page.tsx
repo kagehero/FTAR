@@ -108,7 +108,17 @@ export default function TransferSelectPage() {
               return (
                 <div key={option.classDate.id} className={styles.optionCard}>
                   <div className={styles.optionHeader}>
-                    <h2 className={styles.className}>{option.class.name}</h2>
+                    <div className={styles.optionTitle}>
+                      <span className={styles.classDate}>
+                        {dateObj.toLocaleDateString('ja-JP', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          weekday: 'short',
+                        })}
+                      </span>
+                      <h2 className={styles.className}>{option.class.name}</h2>
+                    </div>
                     <span
                       className={`${styles.capacityBadge} ${
                         option.hasCapacity ? styles.capacityAvailable : styles.capacityFull
@@ -117,13 +127,6 @@ export default function TransferSelectPage() {
                       {option.hasCapacity ? '空きあり' : '満席'}
                     </span>
                   </div>
-                  <p className={styles.classDate}>
-                    {dateObj.toLocaleDateString('ja-JP', {
-                      month: 'long',
-                      day: 'numeric',
-                      weekday: 'short',
-                    })}
-                  </p>
                   <p className={styles.classTime}>
                     {option.class.start_time} - {option.class.end_time}
                   </p>

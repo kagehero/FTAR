@@ -9,7 +9,11 @@ import {
 } from '@/lib/db'
 import type { Attendance, Waitlist } from '@/lib/models'
 import { promoteWaitlistForClassDate } from '@/lib/services/waitlist-service'
-import { TRANSFER_CATEGORY_RULES, TRANSFER_DEADLINE_HOURS } from '@/lib/constants'
+import {
+  TRANSFER_CATEGORY_RULES,
+  TRANSFER_DEADLINE_HOURS,
+  TARGET_GRADE_TO_MEMBER_GRADES,
+} from '@/lib/constants'
 
 // 候補開催日の取得
 export async function GET(
@@ -88,6 +92,8 @@ export async function GET(
     const sourceCategory = originalClass?.category || 'その他'
     const allowedTargetCategories = TRANSFER_CATEGORY_RULES[sourceCategory] ?? [sourceCategory]
 
+    const memberGrade = (user as { grade?: string }).grade
+
     const options = await Promise.all(
       futureClassDates.map(async (cd) => {
         const cls = await classesCollection.findOne({ id: cd.class_id })
@@ -95,6 +101,17 @@ export async function GET(
 
         // 振替可否（特待→全OK、特化→強化NG、同一カテゴリ→OK）
         if (!allowedTargetCategories.includes(cls.category)) return null
+
+        // 学年による絞り込み（会員の学年がクラス対象学年に含まれる場合のみ表示）
+        if (memberGrade && cls.grade) {
+          const classGrades = cls.grade.split(',').map((g) => g.trim()).filter(Boolean)
+          const memberCanAttend = classGrades.some((targetGrade) => {
+            const allowed = TARGET_GRADE_TO_MEMBER_GRADES[targetGrade]
+            if (!allowed || allowed.length === 0) return true
+            return allowed.includes(memberGrade)
+          })
+          if (!memberCanAttend) return null
+        }
 
         // 締切：開始1時間前
         const classDateTime = new Date(cd.date)
@@ -252,6 +269,23 @@ export async function POST(
         { success: false, error: 'このクラスへの振替はできません（カテゴリ制限）' },
         { status: 400 }
       )
+    }
+
+    // 学年による制限
+    const memberGrade = (user as { grade?: string }).grade
+    if (memberGrade && classInfo.grade) {
+      const classGrades = classInfo.grade.split(',').map((g) => g.trim()).filter(Boolean)
+      const memberCanAttend = classGrades.some((targetGrade) => {
+        const allowed = TARGET_GRADE_TO_MEMBER_GRADES[targetGrade]
+        if (!allowed || allowed.length === 0) return true
+        return allowed.includes(memberGrade)
+      })
+      if (!memberCanAttend) {
+        return NextResponse.json(
+          { success: false, error: 'このクラスへの振替はできません（学年制限）' },
+          { status: 400 }
+        )
+      }
     }
 
     // 現在の出席者数

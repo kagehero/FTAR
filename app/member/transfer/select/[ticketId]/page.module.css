@@ -58,8 +58,21 @@
 .optionHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 8px;
+  gap: 12px;
+}
+
+.optionTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.optionTitle .classDate {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-primary, #1976d2);
 }
 
 .className {
