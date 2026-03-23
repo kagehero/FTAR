@@ -37,3 +37,34 @@ export async function sendTransferPromotionEmail(
     console.error('Failed to send transfer promotion email:', error)
   }
 }
+
+// 雨天中止時の振替チケット発行メール送信
+export async function sendCancellationTransferEmail(
+  to: string,
+  memberName: string,
+  className: string,
+  cancelledDate: string,
+  expiresAt: string
+): Promise<void> {
+  if (!SENDGRID_API_KEY || !SENDGRID_FROM) {
+    console.warn('SendGrid not configured, skipping cancellation transfer email')
+    return
+  }
+
+  try {
+    await sgMail.send({
+      to,
+      from: SENDGRID_FROM as string,
+      subject: '【FTAR】雨天中止のお知らせ（振替チケットを発行しました）',
+      text:
+        `${memberName} 様\n\n` +
+        `お世話になっております。\n\n` +
+        `${cancelledDate} の ${className} は雨天中止となりました。\n` +
+        `振替チケットを発行いたしましたので、別のクラスに振り替えてご参加ください。\n\n` +
+        `チケット有効期限: ${expiresAt}\n\n` +
+        `アプリの「振替チケット」から振替先をご選択いただけます。`,
+    })
+  } catch (error) {
+    console.error('Failed to send cancellation transfer email:', error)
+  }
+}

@@ -29,6 +29,7 @@ export default function TransferTicketsPage() {
   const [user, setUser] = useState<any>(null)
   const [tickets, setTickets] = useState<TransferTicket[]>([])
   const [loading, setLoading] = useState(true)
+  const [revertingId, setRevertingId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,6 +61,28 @@ export default function TransferTicketsPage() {
   const handleLogout = async () => {
     await logout()
     router.push('/')
+  }
+
+  const handleRevertTransfer = async (ticketId: string) => {
+    if (!confirm('振替を取り消しますか？別のクラスを選択し直すことができます。')) return
+    setRevertingId(ticketId)
+    try {
+      const res = await fetch(`/api/member/transfer/revert/${ticketId}`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        const res2 = await fetch('/api/member/transfer-tickets')
+        if (res2.ok) {
+          const d = await res2.json()
+          if (d.success) setTickets(d.tickets)
+        }
+      } else {
+        alert(data.error || '取り消しに失敗しました')
+      }
+    } catch (e) {
+      alert('通信エラーが発生しました')
+    } finally {
+      setRevertingId(null)
+    }
   }
 
   const getStatusLabel = (status: string) => {
@@ -180,6 +203,13 @@ export default function TransferTicketsPage() {
                       </p>
                     )}
                   </div>
+                  <button
+                    className={styles.revertButton}
+                    onClick={() => handleRevertTransfer(ticket.id)}
+                    disabled={revertingId === ticket.id}
+                  >
+                    {revertingId === ticket.id ? '処理中...' : '振替を取り消す'}
+                  </button>
                 </div>
               ))}
             </div>

@@ -5,9 +5,11 @@ import {
   getAttendancesCollection,
   getTransferTicketsCollection,
   getMembersCollection,
+  getClassesCollection,
 } from '@/lib/db'
-import type { Attendance, TransferTicket } from '@/lib/models'
+import type { TransferTicket } from '@/lib/models'
 import { TRANSFER_DEADLINE_MONTHS } from '@/lib/constants'
+import { sendCancellationTransferEmail } from '@/lib/email'
 
 // 開催日更新
 export async function PUT(
@@ -57,6 +59,14 @@ export async function PUT(
       const ticketsCollection = await getTransferTicketsCollection()
       const membersCollection = await getMembersCollection()
 
+      // 出席者を先に取得（更新前に必要）
+      const attendances =
+        (autoTransferTicket
+          ? await attendancesCollection
+              .find({ class_date_id: classDateId, status: 'attending' })
+              .toArray()
+          : []) as { member_id: string }[]
+
       // 出席登録を無効化
       await attendancesCollection.updateMany(
         { class_date_id: classDateId },
@@ -64,11 +74,7 @@ export async function PUT(
       )
 
       // 自動振替チケット発行
-      if (autoTransferTicket) {
-        const attendances = await attendancesCollection
-          .find({ class_date_id: classDateId, status: 'attending' })
-          .toArray()
-
+      if (autoTransferTicket && attendances.length > 0) {
         const now = new Date()
         const expiresAt = new Date()
         expiresAt.setMonth(expiresAt.getMonth() + TRANSFER_DEADLINE_MONTHS + 1)
@@ -88,6 +94,31 @@ export async function PUT(
 
         if (tickets.length > 0) {
           await ticketsCollection.insertMany(tickets)
+
+          const classesCollection = await getClassesCollection()
+          const classInfo = await classesCollection.findOne({ id: classDate.class_id })
+          const cancelledDateStr = classDate.date
+            ? new Date(classDate.date).toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short',
+              })
+            : ''
+          const expiresAtStr = expiresAt.toLocaleDateString('ja-JP')
+
+          for (const att of attendances) {
+            const member = await membersCollection.findOne({ id: att.member_id })
+            if (member?.email) {
+              await sendCancellationTransferEmail(
+                member.email,
+                member.name,
+                classInfo?.name || 'クラス',
+                cancelledDateStr,
+                expiresAtStr
+              )
+            }
+          }
         }
       }
     }

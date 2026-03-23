@@ -169,6 +169,15 @@ export async function POST(
       await promoteWaitlistForClassDate(classDateId)
     }
 
+    // 欠席 → 出席 に変更された場合、未使用チケットを失効
+    if (previousStatus === 'absent' && status === 'attending') {
+      const ticketsCollection = await getTransferTicketsCollection()
+      await ticketsCollection.updateMany(
+        { member_id: user.id, class_date_id: classDateId, status: 'unused' },
+        { $set: { status: 'expired', updated_at: new Date() } }
+      )
+    }
+
     return NextResponse.json({
       success: true,
       message: '出欠を登録しました',

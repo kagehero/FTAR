@@ -28,6 +28,7 @@ export default function WaitlistPage() {
   const router = useRouter()
   const [entries, setEntries] = useState<WaitlistEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [cancelingId, setCancelingId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,6 +59,24 @@ export default function WaitlistPage() {
   const handleLogout = async () => {
     await logout()
     router.push('/')
+  }
+
+  const handleCancelWaitlist = async (entryId: string) => {
+    if (!confirm('キャンセル待ちを解除しますか？チケットは未使用のまま、別のクラスを選択できます。')) return
+    setCancelingId(entryId)
+    try {
+      const res = await fetch(`/api/member/waitlist/${entryId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        setEntries((prev) => prev.filter((e) => e.id !== entryId))
+      } else {
+        alert(data.error || '解除に失敗しました')
+      }
+    } catch (e) {
+      alert('通信エラーが発生しました')
+    } finally {
+      setCancelingId(null)
+    }
   }
 
   const getStatusLabel = (status: string) => {
@@ -121,6 +140,15 @@ export default function WaitlistPage() {
                   </p>
                   <p className={styles.classVenue}>会場: {entry.class.venue}</p>
                   <p className={styles.position}>現在の順番: 第{entry.position}番</p>
+                  {entry.status === 'waiting' && (
+                    <button
+                      className={styles.cancelButton}
+                      onClick={() => handleCancelWaitlist(entry.id)}
+                      disabled={cancelingId === entry.id}
+                    >
+                      {cancelingId === entry.id ? '処理中...' : 'キャンセル待ちを解除'}
+                    </button>
+                  )}
                   {entry.status === 'confirmed' && entry.confirmed_at && (
                     <p className={styles.confirmedAt}>
                       繰り上がり日時:{' '}
