@@ -133,11 +133,47 @@
 .sectionTitle {
   font-size: 24px;
   font-weight: 600;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
   color: #333;
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.sectionHint {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.upcomingByDate {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dateGroup {
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #eee;
+}
+
+.dateGroupTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.todayLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-primary);
+  margin-left: 8px;
 }
 
 .badge {

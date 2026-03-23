@@ -7,7 +7,7 @@ import LoadingScreen from '@/components/LoadingScreen'
 import MemberHeader from '@/components/MemberHeader'
 import styles from './page.module.css'
 
-interface TodayClass {
+interface UpcomingClass {
   classDate: {
     id: string
     date: string
@@ -34,7 +34,7 @@ interface Announcement {
 export default function MemberHomePage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
-  const [todayClasses, setTodayClasses] = useState<TodayClass[]>([])
+  const [upcomingClasses, setUpcomingClasses] = useState<UpcomingClass[]>([])
   const [ticketCount, setTicketCount] = useState(0)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,12 +49,12 @@ export default function MemberHomePage() {
       setUser(currentUser)
 
       try {
-        // 本日のクラスを取得
-        const classesRes = await fetch('/api/member/today-classes')
+        // 今後のクラスを取得（14日分、事前欠席登録用）
+        const classesRes = await fetch('/api/member/upcoming-classes?days=14')
         if (classesRes.ok) {
           const classesData = await classesRes.json()
           if (classesData.success) {
-            setTodayClasses(classesData.classes)
+            setUpcomingClasses(classesData.classes)
           }
         }
 
@@ -118,9 +118,17 @@ export default function MemberHomePage() {
     return <LoadingScreen />
   }
 
-  const hasUnregistered = todayClasses.some(
+  const hasUnregistered = upcomingClasses.some(
     (item) => !item.attendance || item.attendance.status === 'unregistered'
   )
+
+  const classesByDate = upcomingClasses.reduce<Record<string, UpcomingClass[]>>((acc, item) => {
+    const key = new Date(item.classDate.date).toISOString().slice(0, 10)
+    if (!acc[key]) acc[key] = []
+    acc[key].push(item)
+    return acc
+  }, {})
+  const sortedDates = Object.keys(classesByDate).sort()
 
   return (
     <div className={styles.container}>
@@ -130,7 +138,7 @@ export default function MemberHomePage() {
         <div className={styles.welcomeBox}>
           <h2 className={styles.welcomeTitle}>ようこそ、{user?.name}さん</h2>
           <p className={styles.welcomeText}>
-            本日の予定とお知らせを確認できます
+            今後の予定とお知らせを確認できます
           </p>
         </div>
 
@@ -149,48 +157,75 @@ export default function MemberHomePage() {
           </button>
         </div>
 
-        {/* 本日の予定 */}
+        {/* 今後の予定（14日分・事前欠席登録可） */}
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>
-            本日の予定
+            今後の予定
             {hasUnregistered && (
               <span className={styles.badge}>出欠未登録あり</span>
             )}
           </h2>
+          <p className={styles.sectionHint}>
+            開始1時間前までに出欠を登録できます
+          </p>
 
-          {todayClasses.length === 0 ? (
-            <div className={styles.emptyMessage}>本日の予定はありません</div>
+          {upcomingClasses.length === 0 ? (
+            <div className={styles.emptyMessage}>
+              今後14日以内の予定はありません。
+              <br />
+              参加クラスが未設定の場合は、管理者にお問い合わせください。
+            </div>
           ) : (
-            <div className={styles.classesList}>
-              {todayClasses.map((item) => {
-                const status = item.attendance?.status || 'unregistered'
-                const isUnregistered = !item.attendance || status === 'unregistered'
+            <div className={styles.upcomingByDate}>
+              {sortedDates.map((dateKey) => {
+                const items = classesByDate[dateKey]
+                const dateLabel = new Date(dateKey).toLocaleDateString('ja-JP', {
+                  month: 'long',
+                  day: 'numeric',
+                  weekday: 'short',
+                })
+                const isToday = dateKey === new Date().toISOString().slice(0, 10)
 
                 return (
-                  <div
-                    key={item.classDate.id}
-                    className={`${styles.classCard} ${isUnregistered ? styles.unregistered : ''}`}
-                  >
-                    <div className={styles.classHeader}>
-                      <h3 className={styles.className}>{item.class.name}</h3>
-                      <span className={`${styles.statusBadge} ${getStatusClass(status)}`}>
-                        {getStatusLabel(status)}
-                      </span>
+                  <div key={dateKey} className={styles.dateGroup}>
+                    <h3 className={styles.dateGroupTitle}>
+                      {dateLabel}
+                      {isToday && <span className={styles.todayLabel}>（本日）</span>}
+                    </h3>
+                    <div className={styles.classesList}>
+                      {items.map((item) => {
+                        const status = item.attendance?.status || 'unregistered'
+                        const isUnregistered = !item.attendance || status === 'unregistered'
+
+                        return (
+                          <div
+                            key={item.classDate.id}
+                            className={`${styles.classCard} ${isUnregistered ? styles.unregistered : ''}`}
+                          >
+                            <div className={styles.classHeader}>
+                              <h3 className={styles.className}>{item.class.name}</h3>
+                              <span className={`${styles.statusBadge} ${getStatusClass(status)}`}>
+                                {getStatusLabel(status)}
+                              </span>
+                            </div>
+                            <div className={styles.classInfo}>
+                              <p className={styles.classTime}>
+                                ⏰ {item.class.start_time} - {item.class.end_time}
+                              </p>
+                              <p className={styles.classVenue}>📍 {item.class.venue}</p>
+                            </div>
+                            {isUnregistered && (
+                              <button
+                                className={styles.quickActionButton}
+                                onClick={() => router.push(`/member/attendance/${item.classDate.id}`)}
+                              >
+                                出欠を登録
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
-                    <div className={styles.classInfo}>
-                      <p className={styles.classTime}>
-                        ⏰ {item.class.start_time} - {item.class.end_time}
-                      </p>
-                      <p className={styles.classVenue}>📍 {item.class.venue}</p>
-                    </div>
-                    {isUnregistered && (
-                      <button
-                        className={styles.quickActionButton}
-                        onClick={() => router.push(`/member/attendance/${item.classDate.id}`)}
-                      >
-                        出欠を登録
-                      </button>
-                    )}
                   </div>
                 )
               })}
