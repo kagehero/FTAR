@@ -22,6 +22,9 @@ interface TransferTicket {
   usedClass?: {
     name: string
   }
+  usedClassDate?: {
+    date: string
+  }
 }
 
 export default function TransferTicketsPage() {
@@ -199,7 +202,14 @@ export default function TransferTicketsPage() {
                     )}
                     {ticket.usedClass && (
                       <p className={styles.usedClass}>
-                        振替先: {ticket.usedClass.name}
+                        振替先: {ticket.usedClassDate?.date
+                          ? `${new Date(ticket.usedClassDate.date).toLocaleDateString('ja-JP', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              weekday: 'short',
+                            })} ${ticket.usedClass.name}`
+                          : ticket.usedClass.name}
                       </p>
                     )}
                   </div>

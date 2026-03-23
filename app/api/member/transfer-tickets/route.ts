@@ -52,8 +52,9 @@ export async function GET(request: NextRequest) {
         }
 
         let usedClassInfo = null
+        let usedClassDate = null
         if (ticket.used_class_date_id) {
-          const usedClassDate = await classDatesCollection.findOne({ id: ticket.used_class_date_id })
+          usedClassDate = await classDatesCollection.findOne({ id: ticket.used_class_date_id })
           if (usedClassDate) {
             usedClassInfo = await classesCollection.findOne({ id: usedClassDate.class_id })
           }
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
           class: classInfo,
           classDate,
           usedClass: usedClassInfo,
+          usedClassDate: usedClassDate ? { date: usedClassDate.date } : null,
         }
       })
     )
