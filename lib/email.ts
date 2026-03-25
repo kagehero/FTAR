@@ -68,3 +68,31 @@ export async function sendCancellationTransferEmail(
     console.error('Failed to send cancellation transfer email:', error)
   }
 }
+
+// 管理者によるパスワード再設定の通知
+export async function sendPasswordResetEmail(
+  to: string,
+  memberName: string,
+  newPassword: string
+): Promise<void> {
+  if (!SENDGRID_API_KEY || !SENDGRID_FROM) {
+    console.warn('SendGrid not configured, skipping password reset email')
+    return
+  }
+
+  try {
+    await sgMail.send({
+      to,
+      from: SENDGRID_FROM as string,
+      subject: '【FTAR】パスワードが再設定されました',
+      text:
+        `${memberName} 様\n\n` +
+        `管理者によりログインパスワードが再設定されました。\n` +
+        `以下のパスワードでログインし、必要に応じてマイページから変更してください。\n\n` +
+        `パスワード: ${newPassword}\n\n` +
+        `※このメールは大切に保管してください。`,
+    })
+  } catch (error) {
+    console.error('Failed to send password reset email:', error)
+  }
+}

@@ -19,6 +19,8 @@ export interface Member {
   // 参加クラス（クラスIDの配列）
   // これが設定されている場合、出欠名簿は基本的にこの参加クラスを基準に表示する
   enrolled_class_ids?: string[]
+  // 振替で選べるクラス（クラスIDの配列）。未設定または空のときは従来のカテゴリ・学年ルールのみ
+  transfer_allowed_class_ids?: string[]
   role: UserRole
   status: MemberStatus
   is_active: boolean

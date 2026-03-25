@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -30,7 +30,34 @@ interface ClassDate {
     day_of_week: number
     start_time: string
     end_time: string
+    grade?: string
   } | null
+}
+
+type ListGroupBy = 'none' | 'month' | 'week'
+
+function startOfWeekMonday(d: Date): Date {
+  const x = new Date(d)
+  const day = x.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  x.setDate(x.getDate() + diff)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+
+function weekSortKeyFromDate(d: Date): string {
+  const s = startOfWeekMonday(d)
+  return `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}-${String(s.getDate()).padStart(2, '0')}`
+}
+
+function formatWeekGroupLabel(weekStartKey: string): string {
+  const [y, m, day] = weekStartKey.split('-').map(Number)
+  const s = new Date(y, m - 1, day)
+  const e = new Date(s)
+  e.setDate(e.getDate() + 6)
+  const short = (d: Date) =>
+    d.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
+  return `${short(s)} 〜 ${short(e)}`
 }
 
 export default function ClassDatesPage() {
@@ -92,6 +119,7 @@ export default function ClassDatesPage() {
   const [cancelNote, setCancelNote] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ClassDate | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [listGroupBy, setListGroupBy] = useState<ListGroupBy>('month')
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const d = new Date()
     return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -108,7 +136,7 @@ export default function ClassDatesPage() {
     try {
       const [classesRes, datesRes] = await Promise.all([
         fetch('/api/admin/classes'),
-        fetch('/api/admin/class-dates'),
+        fetch('/api/admin/class-dates?sort=desc'),
       ])
 
       if (classesRes.ok) {
@@ -314,6 +342,34 @@ export default function ClassDatesPage() {
 
   const calendarWeeks = getCalendarWeeks(calendarMonth)
   const monthLabel = `${calendarMonth.getFullYear()}年${calendarMonth.getMonth() + 1}月`
+
+  const listGroups = useMemo(() => {
+    if (listGroupBy === 'none') {
+      return [{ key: 'all', label: '', items: classDates }]
+    }
+    const map = new Map<string, ClassDate[]>()
+    for (const cd of classDates) {
+      const d = new Date(cd.date)
+      const key =
+        listGroupBy === 'month'
+          ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          : weekSortKeyFromDate(d)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(cd)
+    }
+    const entries = Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]))
+    return entries.map(([key, items]) => ({
+      key,
+      label:
+        listGroupBy === 'month'
+          ? (() => {
+              const [y, m] = key.split('-').map(Number)
+              return `${y}年${m}月`
+            })()
+          : formatWeekGroupLabel(key),
+      items,
+    }))
+  }, [classDates, listGroupBy])
   const prevMonth = () =>
     setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
   const nextMonth = () =>
@@ -385,6 +441,20 @@ export default function ClassDatesPage() {
               カレンダー
             </button>
           </div>
+          {viewMode === 'list' && (
+            <div className={styles.listGroupToggle}>
+              <span className={styles.listGroupLabel}>一覧のまとめ:</span>
+              <select
+                className={styles.listGroupSelect}
+                value={listGroupBy}
+                onChange={(e) => setListGroupBy(e.target.value as ListGroupBy)}
+              >
+                <option value="month">月ごと</option>
+                <option value="week">週ごと（月〜日）</option>
+                <option value="none">まとめない</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {viewMode === 'calendar' && (
@@ -497,107 +567,118 @@ export default function ClassDatesPage() {
               </tr>
             </thead>
             <tbody>
-              {classDates.map((cd) => {
-                const classInfo =
-                  cd.class ??
-                  classes.find((cls) => cls.id === cd.class_id) ??
-                  null
-                const dateObj = new Date(cd.date)
-                return (
-                  <tr key={cd.id}>
-                    <td>
-                      {classInfo
-                        ? classInfo.grade
-                          ? `${classInfo.name}（${classInfo.grade}）`
-                          : classInfo.name
-                        : '削除済みクラス'}
-                    </td>
-                    <td>{dateObj.toLocaleDateString('ja-JP')}</td>
-                    <td>{getDayName(dateObj.getDay())}</td>
-                    <td>
-                      {classInfo
-                        ? `${classInfo.start_time} - ${classInfo.end_time}`
-                        : '-'}
-                    </td>
-                    <td>
-                      <span
-                        className={
-                          (cd.session_status || (cd.is_cancelled ? 'cancelled' : 'scheduled')) ===
-                          'cancelled'
-                            ? styles.cancelledBadge
-                            : (cd.session_status || 'scheduled') === 'holiday'
-                              ? styles.holidayBadge
-                              : styles.activeBadge
-                        }
-                      >
-                        {SESSION_STATUS_LABELS[
-                          cd.session_status ||
-                            (cd.is_cancelled ? 'cancelled' : 'scheduled')
-                        ] || '予定'}
-                      </span>
-                    </td>
-                    <td>
-                      {cd.session_status === 'holiday' ? (
-                        <button
-                          className={styles.cancelButton}
-                          onClick={() => handleRevertHoliday(cd.id)}
-                          title="予定に戻す"
-                        >
-                          予定に戻す
-                        </button>
-                      ) : cd.session_status === 'cancelled' ? (
-                        <button
-                          className={styles.cancelButton}
-                          onClick={() => doCancel(cd.id, false, '', 'scheduled')}
-                        >
-                          再開
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            className={styles.cancelButton}
-                            onClick={() => {
-                              setCancelModal({ id: cd.id, isCancelled: false })
-                              setCancelNote('')
-                            }}
+              {listGroups.map((group) => (
+                <Fragment key={group.key}>
+                  {group.label && (
+                    <tr>
+                      <td colSpan={6} className={styles.groupHeaderRow}>
+                        {group.label}
+                      </td>
+                    </tr>
+                  )}
+                  {group.items.map((cd) => {
+                    const classInfo =
+                      cd.class ??
+                      classes.find((cls) => cls.id === cd.class_id) ??
+                      null
+                    const dateObj = new Date(cd.date)
+                    return (
+                      <tr key={cd.id}>
+                        <td>
+                          {classInfo
+                            ? classInfo.grade
+                              ? `${classInfo.name}（${classInfo.grade}）`
+                              : classInfo.name
+                            : '削除済みクラス'}
+                        </td>
+                        <td>{dateObj.toLocaleDateString('ja-JP')}</td>
+                        <td>{getDayName(dateObj.getDay())}</td>
+                        <td>
+                          {classInfo
+                            ? `${classInfo.start_time} - ${classInfo.end_time}`
+                            : '-'}
+                        </td>
+                        <td>
+                          <span
+                            className={
+                              (cd.session_status || (cd.is_cancelled ? 'cancelled' : 'scheduled')) ===
+                              'cancelled'
+                                ? styles.cancelledBadge
+                                : (cd.session_status || 'scheduled') === 'holiday'
+                                  ? styles.holidayBadge
+                                  : styles.activeBadge
+                            }
                           >
-                            中止
-                          </button>
+                            {SESSION_STATUS_LABELS[
+                              cd.session_status ||
+                                (cd.is_cancelled ? 'cancelled' : 'scheduled')
+                            ] || '予定'}
+                          </span>
+                        </td>
+                        <td>
+                          {cd.session_status === 'holiday' ? (
+                            <button
+                              className={styles.cancelButton}
+                              onClick={() => handleRevertHoliday(cd.id)}
+                              title="予定に戻す"
+                            >
+                              予定に戻す
+                            </button>
+                          ) : cd.session_status === 'cancelled' ? (
+                            <button
+                              className={styles.cancelButton}
+                              onClick={() => doCancel(cd.id, false, '', 'scheduled')}
+                            >
+                              再開
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                className={styles.cancelButton}
+                                onClick={() => {
+                                  setCancelModal({ id: cd.id, isCancelled: false })
+                                  setCancelNote('')
+                                }}
+                              >
+                                中止
+                              </button>
+                              <button
+                                className={styles.cancelButton}
+                                onClick={() => handleSetHoliday(cd.id)}
+                                title="休講日（春休み・祝日・第5週など）"
+                              >
+                                休み
+                              </button>
+                            </>
+                          )}
+                          {classInfo ? (
+                            <Link
+                              href={`/admin/class/${cd.id}/attendance`}
+                              className={styles.attendanceButton}
+                            >
+                              名簿
+                            </Link>
+                          ) : (
+                            <span
+                              className={`${styles.attendanceButton} ${styles.attendanceButtonDisabled}`}
+                              title="クラス情報が存在しません"
+                            >
+                              名簿
+                            </span>
+                          )}
                           <button
-                            className={styles.cancelButton}
-                            onClick={() => handleSetHoliday(cd.id)}
-                            title="休講日（春休み・祝日・第5週など）"
+                            className={styles.deleteButton}
+                            onClick={() => setDeleteTarget(cd)}
+                            title="開催日を削除"
                           >
-                            休み
+                            削除
                           </button>
-                        </>
-                      )}
-                      {classInfo ? (
-                        <Link
-                          href={`/admin/class/${cd.id}/attendance`}
-                          className={styles.attendanceButton}
-                        >
-                          名簿
-                        </Link>
-                      ) : (
-                        <span
-                          className={`${styles.attendanceButton} ${styles.attendanceButtonDisabled}`}
-                          title="クラス情報が存在しません"
-                        >
-                          名簿
-                        </span>
-                      )}
-                      <button
-                        className={styles.deleteButton}
-                        onClick={() => setDeleteTarget(cd)}
-                        title="開催日を削除"
-                      >
-                        削除
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </Fragment>
+              ))}
             </tbody>
           </table>
         </div>

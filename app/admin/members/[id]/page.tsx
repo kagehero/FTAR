@@ -17,6 +17,7 @@ interface Member {
   is_active: boolean
   created_at: string
   enrolled_class_ids?: string[]
+  transfer_allowed_class_ids?: string[]
 }
 
 interface Attendance {
@@ -52,9 +53,15 @@ export default function MemberDetailPage() {
 
   const [user, setUser] = useState<any>(null)
   const [member, setMember] = useState<Member | null>(null)
-  const [classes, setClasses] = useState<{ id: string; name: string; day_of_week: number; start_time: string; grade: string }[]>([])
+  const [classes, setClasses] = useState<
+    { id: string; name: string; day_of_week: number; start_time: string; grade: string; allow_transfer?: boolean }[]
+  >([])
   const [enrolledClassIds, setEnrolledClassIds] = useState<string[]>([])
+  const [transferAllowedClassIds, setTransferAllowedClassIds] = useState<string[]>([])
   const [classSaving, setClassSaving] = useState(false)
+  const [transferSaving, setTransferSaving] = useState(false)
+  const [resetPwLoading, setResetPwLoading] = useState(false)
+  const [tempPasswordModal, setTempPasswordModal] = useState<string | null>(null)
   const [attendances, setAttendances] = useState<Attendance[]>([])
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
@@ -79,6 +86,9 @@ export default function MemberDetailPage() {
         if (data.success) {
           setMember(data.member)
           setEnrolledClassIds(Array.isArray(data.member?.enrolled_class_ids) ? data.member.enrolled_class_ids : [])
+          setTransferAllowedClassIds(
+            Array.isArray(data.member?.transfer_allowed_class_ids) ? data.member.transfer_allowed_class_ids : []
+          )
           setAttendances(data.attendances)
           setTransfers(data.transfers)
           setNotifications(data.notifications)
@@ -133,6 +143,12 @@ export default function MemberDetailPage() {
     setEnrolledClassIds((prev) => (prev.includes(classId) ? prev.filter((x) => x !== classId) : [...prev, classId]))
   }
 
+  const toggleTransferAllowedClass = (classId: string) => {
+    setTransferAllowedClassIds((prev) =>
+      prev.includes(classId) ? prev.filter((x) => x !== classId) : [...prev, classId]
+    )
+  }
+
   const saveEnrolledClasses = async () => {
     setClassSaving(true)
     try {
@@ -152,6 +168,56 @@ export default function MemberDetailPage() {
       toast.error('エラーが発生しました')
     } finally {
       setClassSaving(false)
+    }
+  }
+
+  const saveTransferAllowedClasses = async () => {
+    setTransferSaving(true)
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transfer_allowed_class_ids: transferAllowedClassIds }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '保存に失敗しました')
+        return
+      }
+      toast.success('振替許可クラスを保存しました')
+      setMember((prev) =>
+        prev ? { ...prev, transfer_allowed_class_ids: transferAllowedClassIds } : prev
+      )
+    } catch (e) {
+      toast.error('エラーが発生しました')
+    } finally {
+      setTransferSaving(false)
+    }
+  }
+
+  const handleResetPassword = async (sendEmail: boolean) => {
+    if (sendEmail && !confirm('新しいパスワードを生成し、会員のメールアドレスに送信しますか？')) return
+    if (!sendEmail && !confirm('新しいパスワードを生成します。画面にのみ表示されます。よろしいですか？')) return
+    setResetPwLoading(true)
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sendEmail }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '再設定に失敗しました')
+        return
+      }
+      toast.success(data.message)
+      if (!sendEmail || !data.emailSent) {
+        setTempPasswordModal(data.temporaryPassword)
+      }
+    } catch (e) {
+      toast.error('エラーが発生しました')
+    } finally {
+      setResetPwLoading(false)
     }
   }
 
@@ -200,6 +266,29 @@ export default function MemberDetailPage() {
               </span>
             </div>
           </div>
+          <div className={styles.passwordActions}>
+            <p className={styles.sectionHint}>
+              パスワードは暗号化して保存されており表示できません。再設定すると新しいパスワードが発行されます。
+            </p>
+            <div className={styles.passwordButtons}>
+              <button
+                type="button"
+                className={styles.backButton}
+                onClick={() => handleResetPassword(true)}
+                disabled={resetPwLoading}
+              >
+                {resetPwLoading ? '処理中...' : 'パスワード再設定（メール送信）'}
+              </button>
+              <button
+                type="button"
+                className={styles.backButton}
+                onClick={() => handleResetPassword(false)}
+                disabled={resetPwLoading}
+              >
+                パスワード再設定（画面のみ表示）
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* 参加クラス */}
@@ -233,6 +322,49 @@ export default function MemberDetailPage() {
           <div style={{ marginTop: 12 }}>
             <button className={styles.backButton} onClick={saveEnrolledClasses} disabled={classSaving}>
               {classSaving ? '保存中...' : '参加クラスを保存'}
+            </button>
+          </div>
+        </div>
+
+        {/* 振替で選べるクラス */}
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>振替で選べるクラス（任意）</h2>
+          <p className={styles.sectionHint}>
+            ここで1つ以上選ぶと、会員の振替先は<strong>選択したクラスの開催日のみ</strong>から選べます（未設定・空のときは従来どおり、カテゴリ・学年ルールで自動絞り込み）。
+          </p>
+          {classes.length === 0 ? (
+            <div className={styles.emptyMessage}>クラスが登録されていません</div>
+          ) : (
+            <div className={styles.historyList}>
+              {classes
+                .filter((cls) => cls.allow_transfer !== false)
+                .map((cls) => (
+                  <label key={cls.id} className={styles.historyItem} style={{ cursor: 'pointer' }}>
+                    <div className={styles.historyInfo}>
+                      <span className={styles.historyDate}>
+                        {dayLabels[cls.day_of_week] ?? '-'} {cls.start_time}
+                      </span>
+                      <span className={styles.historyClass}>
+                        {cls.name}
+                        {cls.grade ? `（${cls.grade}）` : ''}
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={transferAllowedClassIds.includes(cls.id)}
+                      onChange={() => toggleTransferAllowedClass(cls.id)}
+                    />
+                  </label>
+                ))}
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <button
+              className={styles.backButton}
+              onClick={saveTransferAllowedClasses}
+              disabled={transferSaving}
+            >
+              {transferSaving ? '保存中...' : '振替許可クラスを保存'}
             </button>
           </div>
         </div>
@@ -314,6 +446,39 @@ export default function MemberDetailPage() {
           </div>
         </div>
 
+        {tempPasswordModal && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setTempPasswordModal(null)}
+            role="presentation"
+          >
+            <div
+              className={styles.modal}
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <h3 className={styles.modalTitle}>新しいパスワード</h3>
+              <p className={styles.modalHint}>
+                以下を会員へ安全に伝えてください。閉じるとこの画面からは再表示できません。
+              </p>
+              <input
+                type="text"
+                readOnly
+                className={styles.modalPasswordField}
+                value={tempPasswordModal}
+                onFocus={(e) => e.target.select()}
+              />
+              <button
+                type="button"
+                className={styles.modalCloseButton}
+                onClick={() => setTempPasswordModal(null)}
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

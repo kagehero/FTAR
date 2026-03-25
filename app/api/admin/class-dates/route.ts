@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     const classId = searchParams.get('classId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const sortOrder = searchParams.get('sort') === 'asc' ? 1 : -1
 
     const classDatesCollection = await getClassDatesCollection()
     const classesCollection = await getClassesCollection()
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     const classDates = await classDatesCollection
       .find(query)
-      .sort({ date: 1 })
+      .sort({ date: sortOrder })
       .toArray()
 
     const result = await Promise.all(

@@ -285,3 +285,38 @@
   justify-content: flex-end;
   margin-top: 24px;
 }
+
+.passwordActions {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.passwordButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.modalPasswordField {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  font-family: ui-monospace, monospace;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  margin-top: 12px;
+  box-sizing: border-box;
+}
+
+.modalCloseButton {
+  margin-top: 16px;
+  padding: 10px 20px;
+  background: var(--color-primary, #1976d2);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}

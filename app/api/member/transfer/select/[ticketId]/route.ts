@@ -93,24 +93,31 @@ export async function GET(
     const allowedTargetCategories = TRANSFER_CATEGORY_RULES[sourceCategory] ?? [sourceCategory]
 
     const memberGrade = (user as { grade?: string }).grade
+    const transferWhitelist = (user as { transfer_allowed_class_ids?: string[] }).transfer_allowed_class_ids
+    const useTransferWhitelist = Array.isArray(transferWhitelist) && transferWhitelist.length > 0
 
     const options = await Promise.all(
       futureClassDates.map(async (cd) => {
         const cls = await classesCollection.findOne({ id: cd.class_id })
         if (!cls || !cls.allow_transfer || !cls.is_active) return null
 
-        // 振替可否（特待→全OK、特化→強化NG、同一カテゴリ→OK）
-        if (!allowedTargetCategories.includes(cls.category)) return null
+        // 会員ごとの振替許可クラス（管理画面で設定）。設定時はここで指定されたクラスのみ
+        if (useTransferWhitelist && !transferWhitelist!.includes(cls.id)) return null
 
-        // 学年による絞り込み（会員の学年がクラス対象学年に含まれる場合のみ表示）
-        if (memberGrade && cls.grade) {
-          const classGrades = cls.grade.split(',').map((g) => g.trim()).filter(Boolean)
-          const memberCanAttend = classGrades.some((targetGrade) => {
-            const allowed = TARGET_GRADE_TO_MEMBER_GRADES[targetGrade]
-            if (!allowed || allowed.length === 0) return true
-            return allowed.includes(memberGrade)
-          })
-          if (!memberCanAttend) return null
+        if (!useTransferWhitelist) {
+          // 振替可否（特待→全OK、特化→強化NG、同一カテゴリ→OK）
+          if (!allowedTargetCategories.includes(cls.category)) return null
+
+          // 学年による絞り込み（会員の学年がクラス対象学年に含まれる場合のみ表示）
+          if (memberGrade && cls.grade) {
+            const classGrades = cls.grade.split(',').map((g) => g.trim()).filter(Boolean)
+            const memberCanAttend = classGrades.some((targetGrade) => {
+              const allowed = TARGET_GRADE_TO_MEMBER_GRADES[targetGrade]
+              if (!allowed || allowed.length === 0) return true
+              return allowed.includes(memberGrade)
+            })
+            if (!memberCanAttend) return null
+          }
         }
 
         // 締切：開始1時間前
@@ -262,29 +269,40 @@ export async function POST(
     const originalClass = originalClassDate
       ? await classesCollection.findOne({ id: originalClassDate.class_id })
       : null
-    const sourceCategory = originalClass?.category || 'その他'
-    const allowedTargetCategories = TRANSFER_CATEGORY_RULES[sourceCategory] ?? [sourceCategory]
-    if (!allowedTargetCategories.includes(classInfo.category)) {
-      return NextResponse.json(
-        { success: false, error: 'このクラスへの振替はできません（カテゴリ制限）' },
-        { status: 400 }
-      )
-    }
+    const transferWhitelist = (user as { transfer_allowed_class_ids?: string[] }).transfer_allowed_class_ids
+    const useTransferWhitelist = Array.isArray(transferWhitelist) && transferWhitelist.length > 0
 
-    // 学年による制限
-    const memberGrade = (user as { grade?: string }).grade
-    if (memberGrade && classInfo.grade) {
-      const classGrades = classInfo.grade.split(',').map((g) => g.trim()).filter(Boolean)
-      const memberCanAttend = classGrades.some((targetGrade) => {
-        const allowed = TARGET_GRADE_TO_MEMBER_GRADES[targetGrade]
-        if (!allowed || allowed.length === 0) return true
-        return allowed.includes(memberGrade)
-      })
-      if (!memberCanAttend) {
+    if (useTransferWhitelist) {
+      if (!transferWhitelist!.includes(classInfo.id)) {
         return NextResponse.json(
-          { success: false, error: 'このクラスへの振替はできません（学年制限）' },
+          { success: false, error: 'このクラスへの振替はできません（振替許可クラス外）' },
           { status: 400 }
         )
+      }
+    } else {
+      const sourceCategory = originalClass?.category || 'その他'
+      const allowedTargetCategories = TRANSFER_CATEGORY_RULES[sourceCategory] ?? [sourceCategory]
+      if (!allowedTargetCategories.includes(classInfo.category)) {
+        return NextResponse.json(
+          { success: false, error: 'このクラスへの振替はできません（カテゴリ制限）' },
+          { status: 400 }
+        )
+      }
+
+      const memberGrade = (user as { grade?: string }).grade
+      if (memberGrade && classInfo.grade) {
+        const classGrades = classInfo.grade.split(',').map((g) => g.trim()).filter(Boolean)
+        const memberCanAttend = classGrades.some((targetGrade) => {
+          const allowed = TARGET_GRADE_TO_MEMBER_GRADES[targetGrade]
+          if (!allowed || allowed.length === 0) return true
+          return allowed.includes(memberGrade)
+        })
+        if (!memberCanAttend) {
+          return NextResponse.json(
+            { success: false, error: 'このクラスへの振替はできません（学年制限）' },
+            { status: 400 }
+          )
+        }
       }
     }
 
