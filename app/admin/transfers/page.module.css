@@ -148,3 +148,140 @@
   font-size: 18px;
   color: #666;
 }
+
+.manualSection {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.manualTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 8px;
+}
+
+.manualHint {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.manualGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.manualField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #555;
+}
+
+.manualSelect,
+.manualInput {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.manualCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.manualButton {
+  padding: 10px 20px;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.manualButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.extendButton {
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid #90caf9;
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.extendButton:hover {
+  background: #bbdefb;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+}
+
+.modalHeading {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.modalText {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #666;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.modalPrimary {
+  padding: 8px 16px;
+  background: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modalSecondary {
+  padding: 8px 16px;
+  background: #eee;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}

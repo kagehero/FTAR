@@ -7,6 +7,7 @@ import {
   getAttendancesCollection,
 } from '@/lib/db'
 import type { TransferTicket, Attendance } from '@/lib/models'
+import { TRANSFER_DEADLINE_MONTHS } from '@/lib/constants'
 
 // 手動で振替チケットを付与
 export async function POST(request: NextRequest) {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { memberId, classDateId, expiresAt } = body
+    const { memberId, classDateId, expiresAt, markAbsent } = body
 
     if (!memberId || !classDateId) {
       return NextResponse.json(
@@ -50,10 +51,28 @@ export async function POST(request: NextRequest) {
 
     const ticketsCollection = await getTransferTicketsCollection()
 
-    // 有効期限の設定
-    let expiryDate = expiresAt ? new Date(expiresAt) : new Date()
-    if (!expiresAt) {
-      expiryDate.setMonth(expiryDate.getMonth() + 1)
+    const existingUnused = await ticketsCollection.findOne({
+      member_id: memberId,
+      class_date_id: classDateId,
+      status: 'unused',
+    })
+    if (existingUnused) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'この会員・この開催日の未使用振替チケットが既にあります',
+        },
+        { status: 400 }
+      )
+    }
+
+    // 有効期限（未指定時は雨天中止発行と同様：TRANSFER_DEADLINE_MONTHS 基準）
+    let expiryDate: Date
+    if (expiresAt) {
+      expiryDate = new Date(expiresAt)
+    } else {
+      expiryDate = new Date()
+      expiryDate.setMonth(expiryDate.getMonth() + TRANSFER_DEADLINE_MONTHS + 1)
       expiryDate.setDate(0)
       expiryDate.setHours(23, 59, 59, 999)
     }
@@ -71,10 +90,39 @@ export async function POST(request: NextRequest) {
 
     await ticketsCollection.insertOne(ticket)
 
+    if (markAbsent === true) {
+      const attendancesCollection = await getAttendancesCollection()
+      const existing = await attendancesCollection.findOne({
+        member_id: memberId,
+        class_date_id: classDateId,
+      })
+      const now = new Date()
+      const attendanceData: Attendance = {
+        id:
+          existing?.id ||
+          `attendance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        member_id: memberId,
+        class_date_id: classDateId,
+        status: 'absent',
+        registered_at: now,
+        changed_by: user.id,
+        created_at: existing?.created_at || now,
+        updated_at: now,
+      }
+      if (existing) {
+        await attendancesCollection.updateOne({ id: existing.id }, { $set: attendanceData })
+      } else {
+        await attendancesCollection.insertOne(attendanceData)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       ticket,
-      message: '振替チケットを発行しました',
+      message:
+        markAbsent === true
+          ? '振替チケットを発行し、欠席を登録しました'
+          : '振替チケットを発行しました',
     })
   } catch (error) {
     console.error('Manual transfer ticket error:', error)

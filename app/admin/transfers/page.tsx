@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser } from '@/lib/auth-client'
 import LoadingScreen from '@/components/LoadingScreen'
 import styles from './page.module.css'
@@ -28,6 +29,23 @@ interface Transfer {
   }
 }
 
+interface FormMember {
+  id: string
+  name: string
+  grade: string
+}
+
+interface FormClass {
+  id: string
+  name: string
+}
+
+interface FormClassDate {
+  id: string
+  class_id: string
+  date: string
+}
+
 export default function TransfersPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -35,37 +53,170 @@ export default function TransfersPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'unused' | 'used' | 'expired'>('all')
 
+  const [members, setMembers] = useState<FormMember[]>([])
+  const [classes, setClasses] = useState<FormClass[]>([])
+  const [classDates, setClassDates] = useState<FormClassDate[]>([])
+  const [manualMemberId, setManualMemberId] = useState('')
+  const [manualClassId, setManualClassId] = useState('')
+  const [manualClassDateId, setManualClassDateId] = useState('')
+  const [manualExpires, setManualExpires] = useState('')
+  const [manualMarkAbsent, setManualMarkAbsent] = useState(true)
+  const [manualSubmitting, setManualSubmitting] = useState(false)
+
+  const [extendTarget, setExtendTarget] = useState<Transfer | null>(null)
+  const [extendDate, setExtendDate] = useState('')
+  const [extendSubmitting, setExtendSubmitting] = useState(false)
+
+  const fetchTransfers = useCallback(async () => {
+    const params = new URLSearchParams()
+    if (filter !== 'all') {
+      params.append('status', filter)
+    }
+    const res = await fetch(`/api/admin/transfers?${params.toString()}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.success) {
+        setTransfers(data.transfers)
+      }
+    }
+  }, [filter])
+
   useEffect(() => {
-    const fetchData = async () => {
+    const init = async () => {
       const currentUser = await getCurrentUser()
       if (!currentUser || currentUser.role !== 'admin') {
         router.push('/')
         return
       }
       setUser(currentUser)
+      setLoading(false)
+    }
+    init()
+  }, [router])
 
+  useEffect(() => {
+    if (!user) return
+    fetchTransfers()
+  }, [user, fetchTransfers])
+
+  useEffect(() => {
+    if (!user) return
+    const loadForm = async () => {
+      const start = new Date()
+      start.setMonth(start.getMonth() - 12)
+      const startStr = start.toISOString().slice(0, 10)
       try {
-        const params = new URLSearchParams()
-        if (filter !== 'all') {
-          params.append('status', filter)
+        const [mRes, cRes, dRes] = await Promise.all([
+          fetch('/api/admin/members'),
+          fetch('/api/admin/classes'),
+          fetch(`/api/admin/class-dates?sort=desc&startDate=${startStr}`),
+        ])
+        if (mRes.ok) {
+          const d = await mRes.json()
+          if (d.success) setMembers(d.members || [])
         }
-
-        const res = await fetch(`/api/admin/transfers?${params.toString()}`)
-        if (res.ok) {
-          const data = await res.json()
-          if (data.success) {
-            setTransfers(data.transfers)
+        if (cRes.ok) {
+          const d = await cRes.json()
+          if (d.success) {
+            setClasses(
+              (d.classes || []).filter((x: { is_active?: boolean }) => x.is_active !== false)
+            )
           }
         }
-      } catch (error) {
-        console.error('Fetch error:', error)
-      } finally {
-        setLoading(false)
+        if (dRes.ok) {
+          const d = await dRes.json()
+          if (d.success) setClassDates(d.classDates || [])
+        }
+      } catch (e) {
+        console.error(e)
       }
     }
+    loadForm()
+  }, [user])
 
-    fetchData()
-  }, [router, filter])
+  const datesForClass = useMemo(() => {
+    if (!manualClassId) return []
+    return classDates
+      .filter((cd) => cd.class_id === manualClassId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [classDates, manualClassId])
+
+  useEffect(() => {
+    setManualClassDateId('')
+  }, [manualClassId])
+
+  const handleManualIssue = async () => {
+    if (!manualMemberId || !manualClassDateId) {
+      toast.error('会員と開催日を選択してください')
+      return
+    }
+    setManualSubmitting(true)
+    try {
+      const body: Record<string, unknown> = {
+        memberId: manualMemberId,
+        classDateId: manualClassDateId,
+        markAbsent: manualMarkAbsent,
+      }
+      if (manualExpires.trim()) {
+        const d = new Date(manualExpires)
+        d.setHours(23, 59, 59, 999)
+        body.expiresAt = d.toISOString()
+      }
+      const res = await fetch('/api/admin/transfers/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '発行に失敗しました')
+        return
+      }
+      toast.success(data.message)
+      setManualClassDateId('')
+      await fetchTransfers()
+    } catch {
+      toast.error('エラーが発生しました')
+    } finally {
+      setManualSubmitting(false)
+    }
+  }
+
+  const openExtend = (t: Transfer) => {
+    const d = new Date(t.expires_at)
+    const next = new Date()
+    next.setMonth(next.getMonth() + 1)
+    next.setHours(23, 59, 59, 999)
+    const pick = next > d ? next : new Date(d.getTime() + 86400000 * 30)
+    setExtendDate(pick.toISOString().slice(0, 10))
+    setExtendTarget(t)
+  }
+
+  const handleExtend = async () => {
+    if (!extendTarget || !extendDate) return
+    setExtendSubmitting(true)
+    try {
+      const d = new Date(extendDate)
+      d.setHours(23, 59, 59, 999)
+      const res = await fetch(`/api/admin/transfers/${extendTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expires_at: d.toISOString() }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '更新に失敗しました')
+        return
+      }
+      toast.success('有効期限を更新しました')
+      setExtendTarget(null)
+      await fetchTransfers()
+    } catch {
+      toast.error('エラーが発生しました')
+    } finally {
+      setExtendSubmitting(false)
+    }
+  }
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -109,6 +260,93 @@ export default function TransfersPage() {
       </header>
 
       <main className={styles.main}>
+        <section className={styles.manualSection}>
+          <h2 className={styles.manualTitle}>手動で振替チケットを発行（イレギュラー対応）</h2>
+          <p className={styles.manualHint}>
+            連絡が間に合わなかった欠席など、事務局で振替チケットを付与できます。必要に応じて同時に<strong>欠席</strong>も名簿に反映します。
+            通常の欠席登録のみの場合は、該当開催日の<strong>出欠名簿</strong>から「欠席」に変更してください。
+            ※会員リストは直近100名までです。対象がいない場合は会員一覧で検索のうえ、発行後に名簿で欠席操作することもできます。
+          </p>
+          <div className={styles.manualGrid}>
+            <label className={styles.manualField}>
+              <span>会員</span>
+              <select
+                value={manualMemberId}
+                onChange={(e) => setManualMemberId(e.target.value)}
+                className={styles.manualSelect}
+              >
+                <option value="">選択</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}（{m.grade}）
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.manualField}>
+              <span>クラス</span>
+              <select
+                value={manualClassId}
+                onChange={(e) => setManualClassId(e.target.value)}
+                className={styles.manualSelect}
+              >
+                <option value="">選択</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.manualField}>
+              <span>開催日（欠席対象の日）</span>
+              <select
+                value={manualClassDateId}
+                onChange={(e) => setManualClassDateId(e.target.value)}
+                className={styles.manualSelect}
+                disabled={!manualClassId}
+              >
+                <option value="">選択</option>
+                {datesForClass.map((cd) => (
+                  <option key={cd.id} value={cd.id}>
+                    {new Date(cd.date).toLocaleDateString('ja-JP', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'short',
+                    })}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.manualField}>
+              <span>有効期限（任意・空欄は通常ルール2ヶ月相当と同じ計算）</span>
+              <input
+                type="date"
+                value={manualExpires}
+                onChange={(e) => setManualExpires(e.target.value)}
+                className={styles.manualInput}
+              />
+            </label>
+          </div>
+          <label className={styles.manualCheckbox}>
+            <input
+              type="checkbox"
+              checked={manualMarkAbsent}
+              onChange={(e) => setManualMarkAbsent(e.target.checked)}
+            />
+            同時に出欠名簿を欠席にする
+          </label>
+          <button
+            type="button"
+            className={styles.manualButton}
+            onClick={handleManualIssue}
+            disabled={manualSubmitting}
+          >
+            {manualSubmitting ? '発行中...' : '振替チケットを発行'}
+          </button>
+        </section>
+
         <div className={styles.filters}>
           <button
             className={filter === 'all' ? styles.filterActive : styles.filterButton}
@@ -146,6 +384,7 @@ export default function TransfersPage() {
                 <th>振替先</th>
                 <th>有効期限</th>
                 <th>状態</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -177,9 +416,7 @@ export default function TransfersPage() {
                         {transfer.used_at && (
                           <span className={styles.dateText}>
                             {' '}
-                            (
-                            {new Date(transfer.used_at).toLocaleDateString('ja-JP')}
-                            )
+                            ({new Date(transfer.used_at).toLocaleDateString('ja-JP')})
                           </span>
                         )}
                       </span>
@@ -193,6 +430,17 @@ export default function TransfersPage() {
                       {getStatusLabel(transfer.status)}
                     </span>
                   </td>
+                  <td>
+                    {(transfer.status === 'unused' || transfer.status === 'expired') && (
+                      <button
+                        type="button"
+                        className={styles.extendButton}
+                        onClick={() => openExtend(transfer)}
+                      >
+                        期限延長
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -201,6 +449,48 @@ export default function TransfersPage() {
 
         {transfers.length === 0 && (
           <div className={styles.emptyMessage}>振替履歴がありません</div>
+        )}
+
+        {extendTarget && (
+          <div
+            className={styles.modalOverlay}
+            onClick={() => !extendSubmitting && setExtendTarget(null)}
+            role="presentation"
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog">
+              <h3 className={styles.modalHeading}>有効期限の延長</h3>
+              <p className={styles.modalText}>
+                {extendTarget.member?.name}様のチケット（未使用・失効のみ変更可能）。休会や事務局判断で延長する場合に利用してください。
+              </p>
+              <label className={styles.manualField}>
+                <span>新しい有効期限</span>
+                <input
+                  type="date"
+                  value={extendDate}
+                  onChange={(e) => setExtendDate(e.target.value)}
+                  className={styles.manualInput}
+                />
+              </label>
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalPrimary}
+                  onClick={handleExtend}
+                  disabled={extendSubmitting}
+                >
+                  {extendSubmitting ? '保存中...' : '保存'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.modalSecondary}
+                  onClick={() => setExtendTarget(null)}
+                  disabled={extendSubmitting}
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>
