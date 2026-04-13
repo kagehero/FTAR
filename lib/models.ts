@@ -7,12 +7,24 @@ export type TicketStatus = 'unused' | 'used' | 'expired'
 export type WaitlistStatus = 'waiting' | 'confirmed' | 'expired'
 export type MemberStatus = 'active' | 'suspended' | 'withdrawn'
 
-// 会員
-export interface Member {
+// 保護者アカウント（メール・パスワードでログイン）。子会員は members で parent_id を持つ
+export interface Parent {
   _id?: string
   id: string
   email: string
   password: string
+  name?: string
+  created_at: Date
+  updated_at: Date
+}
+
+// 会員（お子様1人分。従来はログイン用メール＝本人、親子構成では parent_id あり・email なし）
+export interface Member {
+  _id?: string
+  id: string
+  email?: string
+  password: string
+  parent_id?: string
   name: string
   grade: string // 学年
   phone?: string

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 import { getCurrentUser, logout } from '@/lib/auth-client'
+import { GRADE_OPTIONS } from '@/lib/constants'
 import LoadingScreen from '@/components/LoadingScreen'
 import MemberHeader from '@/components/MemberHeader'
 import styles from './page.module.css'
@@ -13,6 +15,11 @@ export default function MyPage() {
   const [attendance, setAttendance] = useState<any[]>([])
   const [tickets, setTickets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [parentId, setParentId] = useState<string | null>(null)
+  const [siblingCount, setSiblingCount] = useState(0)
+  const [addName, setAddName] = useState('')
+  const [addGrade, setAddGrade] = useState('')
+  const [addingChild, setAddingChild] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -22,6 +29,19 @@ export default function MyPage() {
         return
       }
       setUser(currentUser)
+
+      try {
+        const meRes = await fetch('/api/auth/me', { credentials: 'include' })
+        if (meRes.ok) {
+          const meData = await meRes.json()
+          if (meData.success && meData.parentId) {
+            setParentId(meData.parentId)
+            setSiblingCount(Array.isArray(meData.children) ? meData.children.length : 0)
+          }
+        }
+      } catch {
+        /* ignore */
+      }
 
       try {
         const [attendanceRes, ticketsRes] = await Promise.all([
@@ -57,6 +77,38 @@ export default function MyPage() {
     router.push('/')
   }
 
+  const handleAddSibling = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!addName.trim() || !addGrade) {
+      toast.error('氏名と学年を入力してください')
+      return
+    }
+    setAddingChild(true)
+    try {
+      const res = await fetch('/api/member/children', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: addName.trim(), grade: addGrade }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '登録に失敗しました')
+        return
+      }
+      toast.success('お子様を追加しました。ヘッダーから切り替えられます。')
+      setAddName('')
+      setAddGrade('')
+      setSiblingCount((c) => c + 1)
+      router.refresh()
+      window.location.reload()
+    } catch {
+      toast.error('エラーが発生しました')
+    } finally {
+      setAddingChild(false)
+    }
+  }
+
   if (loading) {
     return <LoadingScreen />
   }
@@ -84,6 +136,47 @@ export default function MyPage() {
             </p>
           </div>
         </section>
+
+        {parentId && siblingCount < 5 && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>ご兄弟のお子様を登録</h2>
+            <p className={styles.hint}>
+              同じ保護者アカウントで、最大5人まで追加できます。ヘッダーの「お子様」から切り替えて利用します。
+            </p>
+            <form className={styles.addChildForm} onSubmit={handleAddSibling}>
+              <div className={styles.addChildRow}>
+                <label>
+                  氏名
+                  <input
+                    type="text"
+                    value={addName}
+                    onChange={(e) => setAddName(e.target.value)}
+                    placeholder="山田 花子"
+                    disabled={addingChild}
+                  />
+                </label>
+                <label>
+                  学年
+                  <select
+                    value={addGrade}
+                    onChange={(e) => setAddGrade(e.target.value)}
+                    disabled={addingChild}
+                  >
+                    <option value="">選択</option>
+                    {GRADE_OPTIONS.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="submit" className={styles.addChildBtn} disabled={addingChild}>
+                  {addingChild ? '登録中...' : '追加する'}
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
 
         {/* 出席履歴 */}
         <section className={styles.section}>

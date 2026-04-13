@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { getCurrentUser } from '@/lib/auth'
-import { getMembersCollection } from '@/lib/db'
+import { getMembersCollection, getParentsCollection } from '@/lib/db'
 import { sendPasswordResetEmail } from '@/lib/email'
 
 function generateTemporaryPassword(length = 12): string {
@@ -56,15 +56,32 @@ export async function POST(
     const plainPassword = generateTemporaryPassword()
     const hashedPassword = await bcrypt.hash(plainPassword, 10)
 
-    await membersCollection.updateOne(
-      { id: memberId },
-      { $set: { password: hashedPassword, updated_at: new Date() } }
-    )
+    let loginEmail = member.email
+    if (member.parent_id) {
+      const parentsCollection = await getParentsCollection()
+      const parent = await parentsCollection.findOne({ id: member.parent_id })
+      if (!parent) {
+        return NextResponse.json(
+          { success: false, error: '保護者アカウントが見つかりません' },
+          { status: 404 }
+        )
+      }
+      await parentsCollection.updateOne(
+        { id: parent.id },
+        { $set: { password: hashedPassword, updated_at: new Date() } }
+      )
+      loginEmail = parent.email
+    } else {
+      await membersCollection.updateOne(
+        { id: memberId },
+        { $set: { password: hashedPassword, updated_at: new Date() } }
+      )
+    }
 
     let emailSent = false
-    if (sendEmail && member.email) {
+    if (sendEmail && loginEmail) {
       try {
-        await sendPasswordResetEmail(member.email, member.name, plainPassword)
+        await sendPasswordResetEmail(loginEmail, member.name, plainPassword)
         emailSent = true
       } catch (e) {
         console.error('Password reset email failed:', e)

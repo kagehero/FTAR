@@ -59,13 +59,13 @@ export default function RegisterPage() {
       <div className={styles.registerBox}>
         <div className={styles.header}>
           <h1 className={styles.title}>新規登録</h1>
-          <p className={styles.subtitle}>新しいアカウントを作成してください</p>
+          <p className={styles.subtitle}>保護者様のメールアドレスでログインするアカウントを作成します（1人目のお子様の情報を入力してください）</p>
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.formGroup}>
             <label htmlFor="name" className={styles.label}>
-              氏名
+              お子様の氏名（1人目）
             </label>
             <input
               id="name"

@@ -1,6 +1,7 @@
 import { MongoClient, Db, Collection } from 'mongodb'
 import type {
   Member,
+  Parent,
   Class,
   Category,
   ClassDate,
@@ -46,6 +47,11 @@ export async function connectToDatabase(): Promise<Db> {
 export async function getMembersCollection(): Promise<Collection<Member>> {
   const database = await connectToDatabase()
   return database.collection<Member>('members')
+}
+
+export async function getParentsCollection(): Promise<Collection<Parent>> {
+  const database = await connectToDatabase()
+  return database.collection<Parent>('parents')
 }
 
 export async function getClassesCollection(): Promise<Collection<Class>> {
@@ -106,9 +112,19 @@ export async function createIndexes(): Promise<void> {
   const tickets = await getTransferTicketsCollection()
   const waitlists = await getWaitlistsCollection()
 
-  // メンバー
-  await members.createIndex({ email: 1 }, { unique: true })
+  // メンバー（email は従来のみ必須。子会員は省略可のため sparse）
+  try {
+    await members.dropIndex('email_1')
+  } catch {
+    /* ignore */
+  }
+  await members.createIndex({ email: 1 }, { unique: true, sparse: true })
   await members.createIndex({ id: 1 }, { unique: true })
+  await members.createIndex({ parent_id: 1 })
+
+  const parentsColl = await getParentsCollection()
+  await parentsColl.createIndex({ id: 1 }, { unique: true })
+  await parentsColl.createIndex({ email: 1 }, { unique: true })
 
   // クラス
   await classes.createIndex({ id: 1 }, { unique: true })

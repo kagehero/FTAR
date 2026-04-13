@@ -95,3 +95,57 @@
   color: #666;
 }
 
+.hint {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.addChildForm {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.addChildRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.addChildRow label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #555;
+}
+
+.addChildRow input,
+.addChildRow select {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+  min-width: 160px;
+}
+
+.addChildBtn {
+  padding: 8px 16px;
+  background: var(--color-primary);
+  color: var(--color-ink-strong);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addChildBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

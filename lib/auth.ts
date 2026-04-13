@@ -1,11 +1,13 @@
-import { getMembersCollection } from './db'
-import type { Member, UserRole } from './models'
+import { getMembersCollection, getParentsCollection } from './db'
+import type { Member, Parent, UserRole } from './models'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 
-// 会員用パスワードを自動生成
+/** 保護者あたりのお子様登録上限（要件の4〜5名に合わせる） */
+export const MAX_CHILDREN_PER_PARENT = 5
+
 export function generateRandomPassword(length: number = 10): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
   let result = ''
@@ -14,6 +16,13 @@ export function generateRandomPassword(length: number = 10): string {
     result += chars[idx]
   }
   return result
+}
+
+export interface JwtPayload {
+  userId: string
+  email: string
+  role: UserRole
+  parentId?: string
 }
 
 export interface LoginResult {
@@ -25,133 +34,130 @@ export interface LoginResult {
 
 export interface RegisterResult {
   success: boolean
-  user?: Omit<Member, 'password'>
+  user?: Omit<Member, 'password'> & { email?: string }
   token?: string
   error?: string
 }
 
-// JWTトークンを生成
-function generateToken(userId: string, email: string, role: UserRole): string {
-  return jwt.sign(
-    { userId, email, role },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  )
+function generateToken(userId: string, email: string, role: UserRole, parentId?: string): string {
+  const payload: Record<string, string> = { userId, email, role }
+  if (parentId) payload.parentId = parentId
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
 }
 
-// トークンを検証
-export function verifyToken(token: string): { userId: string; email: string; role: UserRole } | null {
+export function verifyToken(token: string): JwtPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: UserRole }
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
     return decoded
-  } catch (error) {
+  } catch {
     return null
   }
 }
 
-/**
- * メールアドレスでログイン
- * ロールを自動判別し、無効アカウント/退会者をブロック
- */
-export async function loginWithEmail(
-  email: string,
-  password: string
-): Promise<LoginResult> {
+function isLegacyMemberDoc(m: Member): boolean {
+  return !m.parent_id && !!m.email
+}
+
+export async function loginWithEmail(email: string, password: string): Promise<LoginResult> {
   try {
+    const em = email.toLowerCase()
+    const parentsCollection = await getParentsCollection()
     const membersCollection = await getMembersCollection()
 
-    // 会員を検索
-    const user = await membersCollection.findOne({ email: email.toLowerCase() })
-
-    if (!user) {
+    const parent = await parentsCollection.findOne({ email: em })
+    if (parent) {
+      const ok = await bcrypt.compare(password, parent.password)
+      if (!ok) {
+        return { success: false, error: 'メールアドレスまたはパスワードが正しくありません' }
+      }
+      const children = await membersCollection
+        .find({ parent_id: parent.id, is_deleted: false })
+        .sort({ created_at: 1 })
+        .toArray()
+      const active = children.find((c) => c.is_active && c.status === 'active') ?? children[0]
+      if (!active) {
+        return { success: false, error: 'このアカウントに紐づく会員情報が見つかりません' }
+      }
+      const token = generateToken(active.id, parent.email, 'member', parent.id)
+      const { password: _, ...rest } = active
       return {
-        success: false,
-        error: 'メールアドレスまたはパスワードが正しくありません',
+        success: true,
+        user: { ...rest, email: parent.email } as Omit<Member, 'password'>,
+        token,
       }
     }
 
-    // 無効アカウントまたは退会者のチェック
-    if (!user.is_active || user.is_deleted) {
-      return {
-        success: false,
-        error: 'このアカウントは無効化されているか、退会済みです',
-      }
+    const legacy = await membersCollection.findOne({ email: em })
+    if (!legacy || !isLegacyMemberDoc(legacy)) {
+      return { success: false, error: 'メールアドレスまたはパスワードが正しくありません' }
     }
-
-    // パスワードの検証
-    const isPasswordValid = await bcrypt.compare(password, user.password)
-
+    if (!legacy.is_active || legacy.is_deleted) {
+      return { success: false, error: 'このアカウントは無効化されているか、退会済みです' }
+    }
+    const isPasswordValid = await bcrypt.compare(password, legacy.password)
     if (!isPasswordValid) {
-      return {
-        success: false,
-        error: 'メールアドレスまたはパスワードが正しくありません',
-      }
+      return { success: false, error: 'メールアドレスまたはパスワードが正しくありません' }
     }
-
-    // トークンを生成
-    const token = generateToken(user.id, user.email, user.role)
-
-    // パスワードを除外してユーザー情報を返す
-    const { password: _, ...userWithoutPassword } = user
-
-    return {
-      success: true,
-      user: userWithoutPassword,
-      token,
-    }
+    const token = generateToken(legacy.id, legacy.email!, legacy.role)
+    const { password: __, ...userWithoutPassword } = legacy
+    return { success: true, user: userWithoutPassword, token }
   } catch (error) {
     console.error('Login error:', error)
     const errorMessage = error instanceof Error ? error.message : '予期しないエラーが発生しました'
-    
-    // MongoDB接続エラーの場合
-    if (errorMessage.includes('MongoDB') || errorMessage.includes('MONGODB') || errorMessage.includes('環境変数')) {
+    if (
+      errorMessage.includes('MongoDB') ||
+      errorMessage.includes('MONGODB') ||
+      errorMessage.includes('環境変数')
+    ) {
       return {
         success: false,
         error: 'データベース接続エラーが発生しました。管理者にお問い合わせください。',
       }
     }
-    
-    return {
-      success: false,
-      error: '予期しないエラーが発生しました',
-    }
+    return { success: false, error: '予期しないエラーが発生しました' }
   }
 }
 
 /**
- * ユーザー登録
- * 既定でメンバー（member）として登録
+ * 新規登録：保護者1件 + お子様1人目（メール1つでログイン、子は member に紐づけ）
  */
-export async function registerWithEmail(
+export async function registerParentAndFirstChild(
   email: string,
   password: string,
   name: string,
   grade: string
 ): Promise<RegisterResult> {
   try {
+    const em = email.toLowerCase()
+    const parentsCollection = await getParentsCollection()
     const membersCollection = await getMembersCollection()
 
-    // 既存会員のチェック
-    const existingUser = await membersCollection.findOne({ email: email.toLowerCase() })
-
-    if (existingUser) {
-      return {
-        success: false,
-        error: 'このメールアドレスは既に登録されています',
-      }
+    if (await parentsCollection.findOne({ email: em })) {
+      return { success: false, error: 'このメールアドレスは既に登録されています' }
+    }
+    const legacyHit = await membersCollection.findOne({ email: em })
+    if (legacyHit && isLegacyMemberDoc(legacyHit)) {
+      return { success: false, error: 'このメールアドレスは既に登録されています' }
     }
 
-    // パスワードをハッシュ化
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const rawPw = password.trim().length > 0 ? password : generateRandomPassword(10)
+    const hashedParentPassword = await bcrypt.hash(rawPw, 10)
 
-    // 会員IDを生成
-    const userId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const parentId = `parent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const parent: Parent = {
+      id: parentId,
+      email: em,
+      password: hashedParentPassword,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
 
-    // 新しい会員を作成
-    const newUser: Member = {
-      id: userId,
-      email: email.toLowerCase(),
-      password: hashedPassword,
+    const childId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const childPasswordPlaceholder = await bcrypt.hash(generateRandomPassword(32), 10)
+    const child: Member = {
+      id: childId,
+      parent_id: parentId,
+      password: childPasswordPlaceholder,
       name,
       grade,
       role: 'member',
@@ -163,65 +169,95 @@ export async function registerWithEmail(
       updated_at: new Date(),
     }
 
-    // データベースに保存
-    await membersCollection.insertOne(newUser)
+    await parentsCollection.insertOne(parent)
+    await membersCollection.insertOne(child)
 
-    // トークンを生成
-    const token = generateToken(newUser.id, newUser.email, newUser.role)
-
-    // パスワードを除外してユーザー情報を返す
-    const { password: _, ...userWithoutPassword } = newUser
-
+    const token = generateToken(childId, em, 'member', parentId)
+    const { password: _, ...cOut } = child
     return {
       success: true,
-      user: userWithoutPassword,
+      user: { ...cOut, email: em },
       token,
     }
   } catch (error) {
     console.error('Register error:', error)
-    return {
-      success: false,
-      error: '予期しないエラーが発生しました',
-    }
+    return { success: false, error: '予期しないエラーが発生しました' }
   }
 }
 
-/**
- * 現在の会員情報を取得
- */
-export async function getCurrentUser(token: string): Promise<Omit<Member, 'password'> | null> {
+/** @deprecated 単一会員登録。新規は registerParentAndFirstChild を使用 */
+export async function registerWithEmail(
+  email: string,
+  password: string,
+  name: string,
+  grade: string
+): Promise<RegisterResult> {
+  return registerParentAndFirstChild(email, password, name, grade)
+}
+
+export async function addChildForParent(
+  parentId: string,
+  name: string,
+  grade: string
+): Promise<{ success: boolean; member?: Member; error?: string }> {
+  const membersCollection = await getMembersCollection()
+  const count = await membersCollection.countDocuments({ parent_id: parentId, is_deleted: false })
+  if (count >= MAX_CHILDREN_PER_PARENT) {
+    return { success: false, error: `お子様は最大${MAX_CHILDREN_PER_PARENT}人まで登録できます` }
+  }
+  const childId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const childPasswordPlaceholder = await bcrypt.hash(generateRandomPassword(32), 10)
+  const child: Member = {
+    id: childId,
+    parent_id: parentId,
+    password: childPasswordPlaceholder,
+    name,
+    grade,
+    role: 'member',
+    status: 'active',
+    is_active: true,
+    is_deleted: false,
+    enrolled_class_ids: [],
+    created_at: new Date(),
+    updated_at: new Date(),
+  }
+  await membersCollection.insertOne(child)
+  return { success: true, member: child }
+}
+
+export function reissueTokenForChild(
+  parentEmail: string,
+  parentId: string,
+  childMemberId: string
+): string {
+  return generateToken(childMemberId, parentEmail, 'member', parentId)
+}
+
+export async function getCurrentUser(token: string): Promise<(Omit<Member, 'password'> & { email?: string }) | null> {
   try {
     const decoded = verifyToken(token)
-    if (!decoded) {
-      return null
-    }
+    if (!decoded) return null
 
     const membersCollection = await getMembersCollection()
     const user = await membersCollection.findOne({ id: decoded.userId })
 
-    if (!user || !user.is_active || user.is_deleted) {
-      return null
-    }
+    if (!user || !user.is_active || user.is_deleted) return null
 
-    const { password: _, ...userWithoutPassword } = user
-    return userWithoutPassword
+    const { password: _, ...rest } = user
+    const displayEmail = rest.email ?? decoded.email
+    return { ...rest, email: displayEmail }
   } catch (error) {
     console.error('Get current user error:', error)
     return null
   }
 }
 
-/**
- * 会員情報をIDで取得
- */
 export async function getMemberById(userId: string): Promise<Omit<Member, 'password'> | null> {
   try {
     const membersCollection = await getMembersCollection()
     const user = await membersCollection.findOne({ id: userId })
 
-    if (!user || !user.is_active || user.is_deleted) {
-      return null
-    }
+    if (!user || !user.is_active || user.is_deleted) return null
 
     const { password: _, ...userWithoutPassword } = user
     return userWithoutPassword
@@ -229,4 +265,13 @@ export async function getMemberById(userId: string): Promise<Omit<Member, 'passw
     console.error('Get user by id error:', error)
     return null
   }
+}
+
+export async function listChildrenForParent(parentId: string): Promise<Omit<Member, 'password'>[]> {
+  const membersCollection = await getMembersCollection()
+  const rows = await membersCollection
+    .find({ parent_id: parentId, is_deleted: false })
+    .sort({ created_at: 1 })
+    .toArray()
+  return rows.map(({ password: _, ...m }) => m)
 }

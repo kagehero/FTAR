@@ -56,6 +56,34 @@
   font-weight: 600;
 }
 
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.childSwitch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.childSwitchLabel {
+  font-size: 13px;
+  color: var(--color-text-sub);
+  white-space: nowrap;
+}
+
+.childSelect {
+  max-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+}
+
 .userMenuWrapper {
   position: relative;
 }

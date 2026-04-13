@@ -1,10 +1,18 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 import styles from './MemberHeader.module.css'
 
+interface ChildRow {
+  id: string
+  name: string
+  grade: string
+}
+
 interface MemberHeaderProps {
-  user: { name?: string; email?: string } | null
+  user: { id?: string; name?: string; email?: string } | null
   onLogout: () => Promise<void> | void
 }
 
@@ -23,6 +31,38 @@ const TABS = [
 export default function MemberHeader({ user, onLogout }: MemberHeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const [children, setChildren] = useState<ChildRow[]>([])
+  const [parentId, setParentId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user) {
+      setChildren([])
+      setParentId(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        if (data.success && data.parentId && Array.isArray(data.children)) {
+          if (!cancelled) {
+            setParentId(data.parentId)
+            setChildren(data.children)
+          }
+        } else {
+          setParentId(null)
+          setChildren([])
+        }
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
 
   const getInitial = () => {
     const src = user?.name || user?.email || '?'
@@ -31,6 +71,27 @@ export default function MemberHeader({ user, onLogout }: MemberHeaderProps) {
 
   const handleLogoutClick = async () => {
     await onLogout()
+  }
+
+  const handleSwitchChild = async (memberId: string) => {
+    if (!memberId || memberId === user?.id) return
+    try {
+      const res = await fetch('/api/auth/switch-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ memberId }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error(data.error || '切り替えに失敗しました')
+        return
+      }
+      router.refresh()
+      window.location.reload()
+    } catch {
+      toast.error('通信エラーが発生しました')
+    }
   }
 
   return (
@@ -55,30 +116,46 @@ export default function MemberHeader({ user, onLogout }: MemberHeaderProps) {
           </nav>
         </div>
         {user && (
-          <div className={styles.userMenuWrapper}>
-            <details className={styles.userMenuDetails}>
-              <summary className={styles.avatarButton}>{getInitial()}</summary>
-              <div className={styles.userMenu}>
-                <button
-                  type="button"
-                  className={styles.userMenuItem}
-                  onClick={() => router.push('/member/mypage')}
+          <div className={styles.headerRight}>
+            {parentId && children.length > 0 && (
+              <div className={styles.childSwitch}>
+                <label className={styles.childSwitchLabel} htmlFor="member-child-select">
+                  お子様
+                </label>
+                <select
+                  id="member-child-select"
+                  className={styles.childSelect}
+                  value={user.id}
+                  onChange={(e) => handleSwitchChild(e.target.value)}
                 >
-                  プロフィール
-                </button>
-                <button
-                  type="button"
-                  className={styles.userMenuItem}
-                  onClick={handleLogoutClick}
-                >
-                  ログアウト
-                </button>
+                  {children.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}（{c.grade}）
+                    </option>
+                  ))}
+                </select>
               </div>
-            </details>
+            )}
+            <div className={styles.userMenuWrapper}>
+              <details className={styles.userMenuDetails}>
+                <summary className={styles.avatarButton}>{getInitial()}</summary>
+                <div className={styles.userMenu}>
+                  <button
+                    type="button"
+                    className={styles.userMenuItem}
+                    onClick={() => router.push('/member/mypage')}
+                  >
+                    プロフィール
+                  </button>
+                  <button type="button" className={styles.userMenuItem} onClick={handleLogoutClick}>
+                    ログアウト
+                  </button>
+                </div>
+              </details>
+            </div>
           </div>
         )}
       </div>
     </header>
   )
 }
-
