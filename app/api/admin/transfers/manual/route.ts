@@ -7,7 +7,7 @@ import {
   getAttendancesCollection,
 } from '@/lib/db'
 import type { TransferTicket, Attendance } from '@/lib/models'
-import { TRANSFER_DEADLINE_MONTHS } from '@/lib/constants'
+import { computeTransferTicketExpiryFromAbsenceDate } from '@/lib/transfer-expiry'
 
 // 手動で振替チケットを付与
 export async function POST(request: NextRequest) {
@@ -66,15 +66,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 有効期限（未指定時は雨天中止発行と同様：TRANSFER_DEADLINE_MONTHS 基準）
+    // 有効期限（未指定時は欠席開催日から2ヶ月後の同日終日）
     let expiryDate: Date
     if (expiresAt) {
       expiryDate = new Date(expiresAt)
     } else {
-      expiryDate = new Date()
-      expiryDate.setMonth(expiryDate.getMonth() + TRANSFER_DEADLINE_MONTHS + 1)
-      expiryDate.setDate(0)
-      expiryDate.setHours(23, 59, 59, 999)
+      expiryDate = computeTransferTicketExpiryFromAbsenceDate(new Date(classDate.date))
     }
 
     const ticket: TransferTicket = {

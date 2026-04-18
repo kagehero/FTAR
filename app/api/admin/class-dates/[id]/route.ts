@@ -8,7 +8,7 @@ import {
   getClassesCollection,
 } from '@/lib/db'
 import type { TransferTicket } from '@/lib/models'
-import { TRANSFER_DEADLINE_MONTHS } from '@/lib/constants'
+import { computeTransferTicketExpiryFromAbsenceDate } from '@/lib/transfer-expiry'
 import { sendCancellationTransferEmail } from '@/lib/email'
 
 // 開催日更新
@@ -76,10 +76,7 @@ export async function PUT(
       // 自動振替チケット発行
       if (autoTransferTicket && attendances.length > 0) {
         const now = new Date()
-        const expiresAt = new Date()
-        expiresAt.setMonth(expiresAt.getMonth() + TRANSFER_DEADLINE_MONTHS + 1)
-        expiresAt.setDate(0)
-        expiresAt.setHours(23, 59, 59, 999)
+        const expiresAt = computeTransferTicketExpiryFromAbsenceDate(new Date(classDate.date))
 
         const tickets: TransferTicket[] = attendances.map((att) => ({
           id: `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,

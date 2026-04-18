@@ -8,10 +8,8 @@ import {
 } from '@/lib/db'
 import type { Attendance, TransferTicket } from '@/lib/models'
 import { promoteWaitlistForClassDate } from '@/lib/services/waitlist-service'
-import {
-  TRANSFER_DEADLINE_MONTHS,
-  TRANSFER_LIMIT_PER_MONTH,
-} from '@/lib/constants'
+import { TRANSFER_LIMIT_PER_MONTH } from '@/lib/constants'
+import { computeTransferTicketExpiryFromAbsenceDate } from '@/lib/transfer-expiry'
 
 // 出欠登録
 export async function POST(
@@ -144,10 +142,7 @@ export async function POST(
         if (usedThisMonth >= TRANSFER_LIMIT_PER_MONTH) {
           // 月制限超過のため振替チケットは発行しない（欠席登録自体は成功）
         } else {
-          const expiresAt = new Date()
-          expiresAt.setMonth(expiresAt.getMonth() + TRANSFER_DEADLINE_MONTHS + 1)
-          expiresAt.setDate(0)
-          expiresAt.setHours(23, 59, 59, 999)
+          const expiresAt = computeTransferTicketExpiryFromAbsenceDate(new Date(classDate.date))
 
           const ticket: TransferTicket = {
             id: `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
